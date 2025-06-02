@@ -1,0 +1,472 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  avatar    String?
+  password  String?  // For credential-based auth
+  type      UserType @default(CONSUMER)
+  emailVerified DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  apiKeys       APIKey[]
+  subscriptions Subscription[]
+  usageStats    UsageStats[]
+  creatorProfile CreatorProfile?
+  earnings      Earnings?
+  orders        Order[]
+  reviews       Review[]
+  discussions   Discussion[]
+  accounts      Account[]
+  sessions      Session[]
+
+  @@map("users")
+}
+
+model CreatorProfile {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  displayName     String
+  bio             String?
+  website         String?
+  github          String?
+  twitter         String?
+  linkedin        String?
+  verified        Boolean  @default(false)
+  rating          Float    @default(0)
+  totalEarnings   Float    @default(0)
+  totalDownloads  Int      @default(0)
+  createdAt       DateTime @default(now())
+
+  // Relations
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  models Model[] @relation("CreatorModels")
+
+  @@map("creator_profiles")
+}
+
+model Model {
+  id              String      @id @default(cuid())
+  name            String
+  slug            String      @unique
+  description     String
+  longDescription String?
+  creatorId       String
+  
+  // Categorization
+  category      ModelCategory
+  subcategory   String?
+  architecture  String
+  tasks         String[]
+  
+  // Technical specs
+  modelSize       String
+  contextLength   String?
+  inputModalities String[]
+  outputModalities String[]
+  
+  // Performance
+  averageLatency Int @default(100)
+  
+  // Metadata
+  license       License
+  version       String  @default("1.0.0")
+  tags          String[]
+  
+  // Stats
+  rating        Float @default(0)
+  reviewCount   Int   @default(0)
+  downloadCount Int   @default(0)
+  apiCallCount  Int   @default(0)
+  
+  // Status
+  status   ModelStatus @default(PUBLISHED)
+  featured Boolean     @default(false)
+  
+  // External API info
+  externalId     String? // Original model ID from HF/Replicate
+  externalSource String? // 'huggingface' or 'replicate'
+  apiEndpoint    String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  creator       CreatorProfile @relation("CreatorModels", fields: [creatorId], references: [id])
+  pricing       PricingPlan[]
+  benchmarks    Benchmark[]
+  versions      ModelVersion[]
+  files         ModelFile[]
+  subscriptions Subscription[]
+  usageStats    UsageStats[]
+  reviews       Review[]
+  discussions   Discussion[]
+
+  @@map("models")
+}
+
+model PricingPlan {
+  id       String      @id @default(cuid())
+  modelId  String
+  name     String
+  type     PricingType
+  price    Float
+  unit     String
+  
+  // Limits
+  requestsPerMonth  Int?
+  requestsPerMinute Int?
+  maxBatchSize      Int?
+  
+  // Features
+  features     String[]
+  supportLevel SupportLevel @default(STANDARD)
+  
+  // Stripe integration
+  stripePriceId String?
+  
+  active Boolean @default(true)
+
+  // Relations
+  model         Model          @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  subscriptions Subscription[]
+
+  @@map("pricing_plans")
+}
+
+model Subscription {
+  id                  String           @id @default(cuid())
+  userId              String
+  modelId             String
+  planId              String
+  status              SubscriptionStatus @default(ACTIVE)
+  currentPeriodStart  DateTime
+  currentPeriodEnd    DateTime
+  
+  // Payment info
+  stripeSubscriptionId String?
+  helioTransactionId   String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user  User        @relation(fields: [userId], references: [id])
+  model Model       @relation(fields: [modelId], references: [id])
+  plan  PricingPlan @relation(fields: [planId], references: [id])
+
+  @@unique([userId, modelId, planId])
+  @@map("subscriptions")
+}
+
+model APIKey {
+  id       String   @id @default(cuid())
+  userId   String
+  name     String
+  keyHash  String   @unique
+  lastUsed DateTime?
+  rateLimit Int     @default(1000)
+  isActive Boolean  @default(true)
+  createdAt DateTime @default(now())
+  expiresAt DateTime?
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("api_keys")
+}
+
+model UsageStats {
+  id           String   @id @default(cuid())
+  userId       String
+  modelId      String?
+  date         DateTime @default(now())
+  requestCount Int      @default(0)
+  tokenCount   Int      @default(0)
+  cost         Float    @default(0)
+  responseTime Int      @default(0)
+
+  // Relations
+  user  User   @relation(fields: [userId], references: [id])
+  model Model? @relation(fields: [modelId], references: [id])
+
+  @@map("usage_stats")
+}
+
+model Benchmark {
+  id          String  @id @default(cuid())
+  modelId     String
+  name        String
+  dataset     String
+  metric      String
+  value       Float
+  unit        String?
+  description String?
+
+  // Relations
+  model Model @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  @@map("benchmarks")
+}
+
+model ModelVersion {
+  id           String   @id @default(cuid())
+  modelId      String
+  version      String
+  changelog    String
+  releaseDate  DateTime @default(now())
+  isLatest     Boolean  @default(false)
+  deprecated   Boolean  @default(false)
+  downloadUrl  String?
+
+  // Relations
+  model Model @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  @@map("model_versions")
+}
+
+model ModelFile {
+  id          String @id @default(cuid())
+  modelId     String
+  fileName    String
+  fileSize    Int
+  fileType    String
+  downloadUrl String
+  checksum    String
+
+  // Relations
+  model Model @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  @@map("model_files")
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  modelId   String
+  userId    String
+  rating    Int
+  title     String
+  content   String
+  helpful   Int      @default(0)
+  reported  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  model Model @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id])
+
+  @@map("reviews")
+}
+
+model Discussion {
+  id        String          @id @default(cuid())
+  modelId   String
+  userId    String
+  title     String
+  content   String
+  type      DiscussionType  @default(QUESTION)
+  tags      String[]
+  upvotes   Int             @default(0)
+  pinned    Boolean         @default(false)
+  solved    Boolean         @default(false)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  // Relations
+  model   Model             @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  user    User              @relation(fields: [userId], references: [id])
+  replies DiscussionReply[]
+
+  @@map("discussions")
+}
+
+model DiscussionReply {
+  id           String   @id @default(cuid())
+  discussionId String
+  userId       String
+  content      String
+  upvotes      Int      @default(0)
+  isAnswer     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  discussion Discussion @relation(fields: [discussionId], references: [id], onDelete: Cascade)
+
+  @@map("discussion_replies")
+}
+
+model Order {
+  id            String        @id @default(cuid())
+  userId        String
+  total         Float
+  tax           Float         @default(0)
+  status        OrderStatus   @default(PENDING)
+  paymentMethod PaymentMethod @default(STRIPE)
+  
+  stripePaymentIntentId String?
+  helioTransactionId    String?
+  
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  // Relations
+  user  User        @relation(fields: [userId], references: [id])
+  items OrderItem[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id         String @id @default(cuid())
+  orderId    String
+  modelId    String
+  planId     String
+  quantity   Int    @default(1)
+  unitPrice  Float
+  totalPrice Float
+
+  // Relations
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("order_items")
+}
+
+model Earnings {
+  id                   String @id @default(cuid())
+  creatorId            String @unique
+  totalEarnings        Float  @default(0)
+  currentMonthEarnings Float  @default(0)
+  pendingPayouts       Float  @default(0)
+  lifetimeEarnings     Float  @default(0)
+  revenueShare         Float  @default(20) // Platform fee percentage
+
+  // Relations
+  creator User @relation(fields: [creatorId], references: [id])
+
+  @@map("earnings")
+}
+
+// NextAuth required models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// Enums
+enum UserType {
+  CONSUMER
+  CREATOR
+  ENTERPRISE
+}
+
+enum ModelCategory {
+  NLP
+  COMPUTER_VISION
+  AUDIO
+  MULTIMODAL
+  REINFORCEMENT_LEARNING
+  TIME_SERIES
+  RECOMMENDATION
+  ROBOTICS
+  OTHER
+}
+
+enum License {
+  OPEN_SOURCE
+  COMMERCIAL
+  RESEARCH_ONLY
+  CUSTOM
+}
+
+enum ModelStatus {
+  DRAFT
+  PUBLISHED
+  DEPRECATED
+}
+
+enum PricingType {
+  FREE
+  FREEMIUM
+  PREMIUM
+  ENTERPRISE
+}
+
+enum SupportLevel {
+  COMMUNITY
+  STANDARD
+  PRIORITY
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  EXPIRED
+  PAST_DUE
+}
+
+enum DiscussionType {
+  QUESTION
+  SHOWCASE
+  ISSUE
+  FEATURE_REQUEST
+}
+
+enum OrderStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  STRIPE
+  HELIO
+  CRYPTO
+} 
