@@ -1,291 +1,197 @@
-import { ModelCategory, License } from './types'
+import { ModelCategory, LicenseType, ModelArchitecture, PricingUnit } from "./types"
 
-// Model Categories with metadata
+// Model Categories with Icons and Examples
 export const MODEL_CATEGORIES = [
   {
-    id: 'nlp' as ModelCategory,
-    name: 'Natural Language Processing',
-    description: 'Models for text understanding, generation, and manipulation',
-    icon: '💬',
-    examples: ['GPT-4', 'LLaMA 2', 'BERT', 'T5']
+    id: ModelCategory.NLP,
+    name: "Natural Language Processing",
+    icon: "🧠",
+    description: "Language models, text generation, translation, and understanding",
+    examples: ["GPT-4", "BERT", "T5", "ChatGPT"]
   },
   {
-    id: 'computer-vision' as ModelCategory,
-    name: 'Computer Vision',
-    description: 'Models for image and video understanding',
-    icon: '👁️',
-    examples: ['CLIP', 'YOLO', 'ResNet', 'Stable Diffusion']
+    id: ModelCategory.CV,
+    name: "Computer Vision", 
+    icon: "👁️",
+    description: "Image recognition, generation, and processing models",
+    examples: ["DALL-E", "Stable Diffusion", "YOLO", "ResNet"]
   },
   {
-    id: 'audio' as ModelCategory,
-    name: 'Audio Processing',
-    description: 'Models for speech, music, and audio analysis',
-    icon: '🎵',
-    examples: ['Whisper', 'Wav2Vec', 'MusicGen', 'WavLM']
+    id: ModelCategory.AUDIO,
+    name: "Audio Processing",
+    icon: "🎵", 
+    description: "Speech recognition, text-to-speech, and audio generation",
+    examples: ["Whisper", "Eleven Labs", "WaveNet", "Tacotron"]
   },
   {
-    id: 'multimodal' as ModelCategory,
-    name: 'Multimodal',
-    description: 'Models that process multiple types of data',
-    icon: '🔗',
-    examples: ['CLIP', 'DALLE', 'GPT-4V', 'Flamingo']
+    id: ModelCategory.RL,
+    name: "Reinforcement Learning",
+    icon: "🎮",
+    description: "Game AI, decision making, and control systems",
+    examples: ["AlphaGo", "OpenAI Five", "MuZero", "PPO"]
   },
   {
-    id: 'reinforcement-learning' as ModelCategory,
-    name: 'Reinforcement Learning',
-    description: 'Models trained through interaction and reward',
-    icon: '🎮',
-    examples: ['AlphaGo', 'PPO', 'DQN', 'SAC']
-  },
-  {
-    id: 'time-series' as ModelCategory,
-    name: 'Time Series',
-    description: 'Models for temporal data and forecasting',
-    icon: '📈',
-    examples: ['Prophet', 'LSTM', 'Transformer', 'ARIMA']
-  },
-  {
-    id: 'recommendation' as ModelCategory,
-    name: 'Recommendation',
-    description: 'Models for personalized recommendations',
-    icon: '🎯',
-    examples: ['Collaborative Filtering', 'Matrix Factorization', 'Neural CF']
-  },
-  {
-    id: 'robotics' as ModelCategory,
-    name: 'Robotics',
-    description: 'Models for robotic control and perception',
-    icon: '🤖',
-    examples: ['RT-1', 'PaLM-E', 'BC-Z', 'IBC']
-  },
-  {
-    id: 'other' as ModelCategory,
-    name: 'Other',
-    description: 'Specialized models not covered by other categories',
-    icon: '⚡',
-    examples: []
+    id: ModelCategory.MULTIMODAL,
+    name: "Multimodal",
+    icon: "🔄",
+    description: "Models that work with multiple data types (text, image, audio)",
+    examples: ["GPT-4V", "CLIP", "DALL-E 2", "Flamingo"]
   }
 ] as const
 
 // Model Architectures
 export const MODEL_ARCHITECTURES = [
-  'Transformer',
-  'LLaMA',
-  'Falcon',
-  'GPT',
-  'BERT',
-  'T5',
-  'Mistral',
-  'PaLM',
-  'Claude',
-  'Gemini',
-  'ResNet',
-  'ConvNet',
-  'Vision Transformer',
-  'YOLO',
-  'U-Net',
-  'GAN',
-  'VAE',
-  'Diffusion',
-  'LSTM',
-  'GRU',
-  'CNN',
-  'RNN',
-  'Custom'
+  { id: ModelArchitecture.TRANSFORMER, name: "Transformer", description: "Attention-based neural network architecture" },
+  { id: ModelArchitecture.LLAMA, name: "LLaMA", description: "Meta's Large Language Model architecture" },
+  { id: ModelArchitecture.FALCON, name: "Falcon", description: "Open-source language model by TII" },
+  { id: ModelArchitecture.CNN, name: "Convolutional Neural Network", description: "Deep learning for image processing" },
+  { id: ModelArchitecture.RNN, name: "Recurrent Neural Network", description: "Sequential data processing" },
+  { id: ModelArchitecture.GAN, name: "Generative Adversarial Network", description: "Generative model training" },
+  { id: ModelArchitecture.DIFFUSION, name: "Diffusion Model", description: "Progressive noise removal for generation" },
+  { id: ModelArchitecture.VAE, name: "Variational Autoencoder", description: "Probabilistic generative model" },
+  { id: ModelArchitecture.BERT, name: "BERT", description: "Bidirectional Encoder Representations" },
+  { id: ModelArchitecture.GPT, name: "GPT", description: "Generative Pre-trained Transformer" }
 ] as const
 
-// Common Tasks by Category
-export const TASKS_BY_CATEGORY = {
-  'nlp': [
-    'text-generation',
-    'text-classification',
-    'sentiment-analysis',
-    'named-entity-recognition',
-    'question-answering',
-    'summarization',
-    'translation',
-    'text-embedding',
-    'conversation',
-    'code-generation',
-    'text-to-sql',
-    'fill-mask'
-  ],
-  'computer-vision': [
-    'image-classification',
-    'object-detection',
-    'image-segmentation',
-    'face-recognition',
-    'optical-character-recognition',
-    'image-generation',
-    'image-to-image',
-    'image-to-text',
-    'video-classification',
-    'video-generation',
-    'style-transfer',
-    'super-resolution'
-  ],
-  'audio': [
-    'automatic-speech-recognition',
-    'text-to-speech',
-    'audio-classification',
-    'music-generation',
-    'audio-to-audio',
-    'voice-conversion',
-    'sound-event-detection',
-    'speaker-recognition',
-    'audio-separation',
-    'noise-reduction'
-  ],
-  'multimodal': [
-    'visual-question-answering',
-    'image-text-to-text',
-    'document-question-answering',
-    'text-to-image',
-    'image-to-text',
-    'video-text-to-text'
-  ],
-  'reinforcement-learning': [
-    'robotics',
-    'game-playing',
-    'autonomous-driving',
-    'resource-allocation',
-    'trading',
-    'control-systems'
-  ],
-  'time-series': [
-    'forecasting',
-    'anomaly-detection',
-    'classification',
-    'regression',
-    'imputation'
-  ],
-  'recommendation': [
-    'collaborative-filtering',
-    'content-based',
-    'hybrid',
-    'session-based',
-    'ranking'
-  ],
-  'robotics': [
-    'manipulation',
-    'navigation',
-    'perception',
-    'planning',
-    'control'
-  ],
-  'other': []
-} as const
-
-// License Types
+// License Types with Colors
 export const LICENSE_TYPES = [
-  {
-    id: 'open-source' as License,
-    name: 'Open Source',
-    description: 'Free to use, modify, and distribute',
-    color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
-  },
-  {
-    id: 'commercial' as License,
-    name: 'Commercial',
-    description: 'Requires license for commercial use',
-    color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300'
-  },
-  {
-    id: 'research-only' as License,
-    name: 'Research Only',
-    description: 'Limited to research and non-commercial use',
-    color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300'
-  },
-  {
-    id: 'custom' as License,
-    name: 'Custom',
-    description: 'Custom licensing terms',
-    color: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
-  }
+  { id: LicenseType.MIT, name: "MIT", color: "green", description: "Permissive open source license" },
+  { id: LicenseType.APACHE2, name: "Apache 2.0", color: "blue", description: "Permissive license with patent protection" },
+  { id: LicenseType.GPL3, name: "GPL 3.0", color: "orange", description: "Copyleft open source license" },
+  { id: LicenseType.OPENRAIL, name: "OpenRAIL", color: "purple", description: "Responsible AI license" },
+  { id: LicenseType.PROPRIETARY, name: "Proprietary", color: "red", description: "Closed source, commercial use" },
+  { id: LicenseType.COMMERCIAL, name: "Commercial", color: "yellow", description: "Commercial use allowed" },
+  { id: LicenseType.CC_BY, name: "CC BY", color: "teal", description: "Creative Commons Attribution" },
+  { id: LicenseType.CC_BY_SA, name: "CC BY-SA", color: "indigo", description: "Creative Commons ShareAlike" }
 ] as const
 
-// Pricing Constants
+// Pricing Units
 export const PRICING_UNITS = [
-  '1k tokens',
-  '1M tokens',
-  'request',
-  'hour',
-  'day',
-  'month',
-  'image',
-  'minute',
-  'second',
-  'API call'
+  { id: PricingUnit.TOKENS, name: "Tokens", description: "Per 1,000 tokens processed" },
+  { id: PricingUnit.REQUESTS, name: "Requests", description: "Per API request made" },
+  { id: PricingUnit.MINUTES, name: "Minutes", description: "Per minute of audio processed" },
+  { id: PricingUnit.IMAGES, name: "Images", description: "Per image generated or processed" },
+  { id: PricingUnit.MONTHLY, name: "Monthly", description: "Monthly subscription fee" },
+  { id: PricingUnit.ANNUAL, name: "Annual", description: "Annual subscription fee" }
 ] as const
 
 // Platform Configuration
 export const PLATFORM_CONFIG = {
-  DEFAULT_REVENUE_SHARE: 20, // 20% platform fee
-  MAX_FILE_SIZE: 10 * 1024 * 1024 * 1024, // 10GB
-  SUPPORTED_MODEL_FORMATS: ['.pkl', '.pt', '.pth', '.onnx', '.h5', '.pb', '.tflite', '.bin'],
-  MAX_DESCRIPTION_LENGTH: 5000,
-  MAX_MODEL_NAME_LENGTH: 100,
-  MIN_MODEL_NAME_LENGTH: 3,
-  MAX_TAGS: 20,
-  PAGINATION: {
-    DEFAULT_PAGE_SIZE: 24,
-    MAX_PAGE_SIZE: 100
-  },
-  RATE_LIMITS: {
-    API_CALLS_PER_HOUR: 1000,
-    SEARCHES_PER_MINUTE: 60,
-    UPLOADS_PER_DAY: 10
+  // Revenue sharing
+  CREATOR_REVENUE_SHARE: 0.7, // 70% to creator, 30% to platform
+  PLATFORM_FEE: 0.3,
+  
+  // File upload limits
+  MAX_MODEL_FILE_SIZE: 10 * 1024 * 1024 * 1024, // 10GB
+  MAX_SAMPLE_FILE_SIZE: 100 * 1024 * 1024, // 100MB
+  ALLOWED_FILE_TYPES: [
+    '.pkl', '.pt', '.pth', '.safetensors', '.bin', '.h5', '.pb', 
+    '.onnx', '.tflite', '.json', '.yaml', '.yml', '.txt', '.md',
+    '.zip', '.tar.gz', '.tar'
+  ],
+  
+  // Rate limits
+  FREE_TIER_REQUESTS_PER_MINUTE: 10,
+  PREMIUM_TIER_REQUESTS_PER_MINUTE: 1000,
+  MAX_CONCURRENT_REQUESTS: 5,
+  
+  // Pagination
+  DEFAULT_PAGE_SIZE: 20,
+  MAX_PAGE_SIZE: 100,
+  
+  // Search
+  SEARCH_RESULTS_LIMIT: 1000,
+  SEARCH_DEBOUNCE_MS: 300,
+  
+  // Verification requirements
+  CREATOR_VERIFICATION_REQUIREMENTS: {
+    MIN_MODELS: 3,
+    MIN_DOWNLOADS: 1000,
+    MIN_RATING: 4.0,
+    IDENTITY_VERIFICATION: true
   }
 } as const
 
-// Sort Options
+// Sort Options for Model Listings
 export const SORT_OPTIONS = [
-  { value: 'relevance', label: 'Most Relevant' },
-  { value: 'rating', label: 'Highest Rated' },
-  { value: 'downloads', label: 'Most Popular' },
-  { value: 'recent', label: 'Recently Added' },
-  { value: 'price-low', label: 'Price: Low to High' },
-  { value: 'price-high', label: 'Price: High to Low' }
+  { value: "popularity", label: "Most Popular", description: "Based on downloads and usage" },
+  { value: "rating", label: "Highest Rated", description: "Based on user reviews" },
+  { value: "recent", label: "Recently Added", description: "Newest models first" },
+  { value: "downloads", label: "Most Downloaded", description: "Download count" },
+  { value: "price-low", label: "Price: Low to High", description: "Cheapest first" },
+  { value: "price-high", label: "Price: High to Low", description: "Most expensive first" },
+  { value: "alphabetical", label: "A-Z", description: "Alphabetical order" }
 ] as const
 
-// Featured Sections
-export const FEATURED_SECTIONS = [
-  { id: 'trending', name: 'Trending', icon: '📈' },
-  { id: 'new', name: 'New Releases', icon: '✨' },
-  { id: 'popular', name: 'Most Popular', icon: '🔥' },
-  { id: 'staff-picks', name: 'Staff Picks', icon: '⭐' },
-  { id: 'open-source', name: 'Open Source', icon: '🌟' }
-] as const
-
-// Error Messages
-export const ERROR_MESSAGES = {
-  NETWORK_ERROR: 'Network error. Please check your connection and try again.',
-  UNAUTHORIZED: 'You must be logged in to perform this action.',
-  FORBIDDEN: 'You do not have permission to perform this action.',
-  NOT_FOUND: 'The requested resource was not found.',
-  VALIDATION_ERROR: 'Please check your input and try again.',
-  SERVER_ERROR: 'An unexpected error occurred. Please try again later.',
-  FILE_TOO_LARGE: 'File size exceeds the maximum allowed limit.',
-  INVALID_FILE_TYPE: 'File type is not supported.',
-  RATE_LIMIT_EXCEEDED: 'Too many requests. Please try again later.'
+// Status Messages
+export const STATUS_MESSAGES = {
+  SUCCESS: {
+    MODEL_UPLOADED: "Model uploaded successfully!",
+    PROFILE_UPDATED: "Profile updated successfully!",
+    SUBSCRIPTION_CREATED: "Subscription created successfully!",
+    PAYMENT_COMPLETED: "Payment completed successfully!",
+    REVIEW_SUBMITTED: "Review submitted successfully!"
+  },
+  ERROR: {
+    MODEL_UPLOAD_FAILED: "Failed to upload model. Please try again.",
+    PAYMENT_FAILED: "Payment failed. Please check your payment details.",
+    SUBSCRIPTION_FAILED: "Failed to create subscription. Please try again.",
+    NETWORK_ERROR: "Network error. Please check your connection.",
+    UNAUTHORIZED: "You need to sign in to perform this action.",
+    FORBIDDEN: "You don't have permission to perform this action.",
+    NOT_FOUND: "The requested resource was not found.",
+    SERVER_ERROR: "Internal server error. Please try again later."
+  },
+  WARNING: {
+    UNSAVED_CHANGES: "You have unsaved changes. Are you sure you want to leave?",
+    DELETE_CONFIRMATION: "This action cannot be undone. Are you sure?",
+    QUOTA_EXCEEDED: "You've exceeded your quota. Please upgrade your plan.",
+    MAINTENANCE_MODE: "The platform is under maintenance. Some features may be unavailable."
+  }
 } as const
 
-// Success Messages
-export const SUCCESS_MESSAGES = {
-  MODEL_CREATED: 'Model created successfully!',
-  MODEL_UPDATED: 'Model updated successfully!',
-  MODEL_DELETED: 'Model deleted successfully!',
-  REVIEW_SUBMITTED: 'Review submitted successfully!',
-  SUBSCRIPTION_CREATED: 'Subscription created successfully!',
-  PAYMENT_COMPLETED: 'Payment completed successfully!',
-  API_KEY_GENERATED: 'API key generated successfully!',
-  PROFILE_UPDATED: 'Profile updated successfully!'
-} as const
-
-// Helio Configuration
+// Helio Payment Configuration
 export const HELIO_CONFIG = {
-  PRODUCTION_API: 'https://api.hel.io/v1',
-  DEVELOPMENT_API: 'https://api.dev.hel.io/v1',
-  WEBHOOK_EVENTS: ['CREATED', 'STARTED', 'RENEWED', 'ENDED'] as const,
-  SUPPORTED_CURRENCIES: ['USDC', 'SOL', 'ETH'] as const
+  API_BASE_URL: process.env.HELIO_API_URL || "https://api.hel.io",
+  WEBHOOK_SECRET: process.env.HELIO_WEBHOOK_SECRET,
+  SUPPORTED_CURRENCIES: ["SOL", "USDC", "ETH", "BTC", "MATIC", "AVAX"],
+  DEFAULT_CURRENCY: "USDC",
+  PAYMENT_EXPIRY_MINUTES: 30,
+  SUBSCRIPTION_RENEWAL_BUFFER_HOURS: 24
+} as const
+
+// Feature Flags
+export const FEATURE_FLAGS = {
+  CRYPTO_PAYMENTS: process.env.NEXT_PUBLIC_ENABLE_CRYPTO_PAYMENTS === "true",
+  MODEL_FINE_TUNING: process.env.NEXT_PUBLIC_ENABLE_FINE_TUNING === "true",
+  SOCIAL_FEATURES: process.env.NEXT_PUBLIC_ENABLE_SOCIAL_FEATURES === "true",
+  ADVANCED_ANALYTICS: process.env.NEXT_PUBLIC_ENABLE_ADVANCED_ANALYTICS === "true",
+  API_PLAYGROUND: process.env.NEXT_PUBLIC_ENABLE_API_PLAYGROUND === "true",
+  COMMUNITY_FEATURES: process.env.NEXT_PUBLIC_ENABLE_COMMUNITY_FEATURES === "true"
+} as const
+
+// API Endpoints
+export const API_ENDPOINTS = {
+  MODELS: "/api/models",
+  CREATORS: "/api/creators", 
+  SUBSCRIPTIONS: "/api/subscriptions",
+  PAYMENTS: "/api/payments",
+  ANALYTICS: "/api/analytics",
+  SEARCH: "/api/search",
+  UPLOAD: "/api/upload",
+  WEBHOOKS: {
+    HELIO: "/api/webhooks/helio",
+    STRIPE: "/api/webhooks/stripe"
+  }
+} as const
+
+// External Service URLs
+export const EXTERNAL_SERVICES = {
+  HUGGING_FACE: "https://huggingface.co",
+  REPLICATE: "https://replicate.com",
+  GITHUB: "https://github.com",
+  DISCORD: "https://discord.gg/koynai",
+  TWITTER: "https://twitter.com/koynai",
+  DOCS: "https://docs.koyn.ai",
+  SUPPORT: "https://support.koyn.ai"
 } as const 

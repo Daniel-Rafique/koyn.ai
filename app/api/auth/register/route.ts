@@ -4,25 +4,55 @@ import { prisma } from "@/lib/database"
 import { z } from "zod"
 
 const registerSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters"),
   email: z.string().email("Invalid email address"),
-  password: z.string().min(8, "Password must be at least 8 characters")
+  username: z.string()
+    .min(3, "Username must be at least 3 characters")
+    .max(30, "Username must be less than 30 characters")
+    .regex(/^[a-zA-Z0-9_-]+$/, "Username can only contain letters, numbers, hyphens, and underscores"),
+  displayName: z.string().min(1, "Display name is required").max(100, "Display name too long"),
+  password: z.string()
+    .min(8, "Password must be at least 8 characters")
+    .regex(/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, "Password must contain at least one uppercase letter, one lowercase letter, and one number"),
+  role: z.enum(["CONSUMER", "CREATOR"]),
+  subscribeNewsletter: z.boolean().optional(),
 })
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { name, email, password } = registerSchema.parse(body)
+    
+    // Validate request data
+    const validationResult = registerSchema.safeParse(body)
+    if (!validationResult.success) {
+      return NextResponse.json(
+        { error: "Validation failed", details: validationResult.error.issues },
+        { status: 400 }
+      )
+    }
 
-    // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
+    const { email, username, displayName, password, role, subscribeNewsletter } = validationResult.data
+
+    // Check if user already exists by email
+    const existingUserByEmail = await prisma.user.findUnique({
       where: { email }
     })
 
-    if (existingUser) {
+    if (existingUserByEmail) {
       return NextResponse.json(
-        { error: "User with this email already exists" },
-        { status: 400 }
+        { error: "A user with this email already exists" },
+        { status: 409 }
+      )
+    }
+
+    // Check if display name is already taken (using name field)
+    const existingUserByName = await prisma.user.findFirst({
+      where: { name: username }
+    })
+
+    if (existingUserByName) {
+      return NextResponse.json(
+        { error: "This username is already taken" },
+        { status: 409 }
       )
     }
 
@@ -33,35 +63,68 @@ export async function POST(request: NextRequest) {
     // Create user
     const user = await prisma.user.create({
       data: {
-        name,
         email,
+        name: username, // Using 'name' field from schema
         password: hashedPassword,
-        type: "CONSUMER"
+        type: role as any, // Converting to UserType enum
+        createdAt: new Date(),
+        updatedAt: new Date(),
       },
       select: {
         id: true,
-        name: true,
         email: true,
+        name: true,
         type: true,
-        createdAt: true
+        createdAt: true,
       }
     })
 
-    return NextResponse.json({
-      success: true,
-      message: "Account created successfully",
-      user
-    })
+    // If user is a creator, create creator profile
+    if (role === "CREATOR") {
+      await prisma.creatorProfile.create({
+        data: {
+          userId: user.id,
+          displayName: displayName,
+          bio: `${displayName}'s AI models and solutions`,
+          verified: false,
+          rating: 0,
+          totalEarnings: 0,
+          totalDownloads: 0,
+          createdAt: new Date(),
+        }
+      })
+    }
+
+    // TODO: Send verification email
+    // await sendVerificationEmail(user.email, user.id)
+
+    // Log successful registration
+    console.log(`New user registered: ${user.email} (${user.type})`)
+
+    return NextResponse.json(
+      { 
+        message: "Account created successfully",
+        user: {
+          id: user.id,
+          email: user.email,
+          username: user.name,
+          role: user.type,
+        }
+      },
+      { status: 201 }
+    )
 
   } catch (error) {
-    if (error instanceof z.ZodError) {
+    console.error("Registration error:", error)
+    
+    // Handle specific Prisma errors
+    if (error instanceof Error && error.message.includes("Unique constraint")) {
       return NextResponse.json(
-        { error: error.errors[0].message },
-        { status: 400 }
+        { error: "User with this email or username already exists" },
+        { status: 409 }
       )
     }
 
-    console.error("Registration error:", error)
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

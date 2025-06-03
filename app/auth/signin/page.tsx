@@ -3,112 +3,153 @@
 import { useState } from "react"
 import { signIn, getSession } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import * as z from "zod"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Separator } from "@/components/ui/separator"
-import { Github, Mail, Chrome, Loader2, Eye, EyeOff } from "lucide-react"
-
-const signInSchema = z.object({
-  email: z.string().email("Invalid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters")
-})
-
-type SignInForm = z.infer<typeof signInSchema>
+import { Github, Mail, Chrome, Loader2, AlertCircle } from "lucide-react"
 
 export default function SignInPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const callbackUrl = searchParams.get("callbackUrl") || "/"
+  const error = searchParams.get("error")
+  
   const [isLoading, setIsLoading] = useState(false)
-  const [showPassword, setShowPassword] = useState(false)
-  const [error, setError] = useState("")
-
-  const callbackUrl = searchParams?.get("callbackUrl") || "/models"
-
-  const form = useForm<SignInForm>({
-    resolver: zodResolver(signInSchema),
-    defaultValues: {
-      email: "",
-      password: ""
-    }
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false)
+  const [isGithubLoading, setIsGithubLoading] = useState(false)
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
   })
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
 
-  const onSubmit = async (data: SignInForm) => {
+  const handleCredentialsSignIn = async (e: React.FormEvent) => {
+    e.preventDefault()
     setIsLoading(true)
-    setError("")
+    setFormErrors({})
+
+    // Basic validation
+    const errors: Record<string, string> = {}
+    if (!formData.email) errors.email = "Email is required"
+    if (!formData.password) errors.password = "Password is required"
+    
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors)
+      setIsLoading(false)
+      return
+    }
 
     try {
       const result = await signIn("credentials", {
-        email: data.email,
-        password: data.password,
-        redirect: false
+        email: formData.email,
+        password: formData.password,
+        redirect: false,
       })
 
       if (result?.error) {
-        setError("Invalid email or password")
+        setFormErrors({ general: "Invalid email or password" })
       } else {
+        // Refresh session and redirect
+        await getSession()
         router.push(callbackUrl)
         router.refresh()
       }
     } catch (error) {
-      setError("An error occurred. Please try again.")
+      setFormErrors({ general: "An error occurred. Please try again." })
     } finally {
       setIsLoading(false)
     }
   }
 
   const handleOAuthSignIn = async (provider: "google" | "github") => {
-    setIsLoading(true)
+    if (provider === "google") setIsGoogleLoading(true)
+    if (provider === "github") setIsGithubLoading(true)
+
     try {
       await signIn(provider, { callbackUrl })
     } catch (error) {
-      setError("An error occurred. Please try again.")
-      setIsLoading(false)
+      console.error(`Error signing in with ${provider}:`, error)
+    } finally {
+      setIsGoogleLoading(false)
+      setIsGithubLoading(false)
+    }
+  }
+
+  const getErrorMessage = (error: string | null) => {
+    switch (error) {
+      case "CredentialsSignin":
+        return "Invalid email or password"
+      case "OAuthAccountNotLinked":
+        return "Account already exists with different provider"
+      case "EmailCreateAccount":
+        return "Could not create account"
+      case "Callback":
+        return "Authentication callback error"
+      default:
+        return "An error occurred during sign in"
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted/20 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 px-4">
       <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">Welcome back</CardTitle>
-          <CardDescription className="text-center">
-            Sign in to your account to access the AI marketplace
+        <CardHeader className="space-y-1 text-center">
+          <CardTitle className="text-2xl font-bold">Welcome back</CardTitle>
+          <CardDescription>
+            Sign in to your account to continue
           </CardDescription>
         </CardHeader>
-        
         <CardContent className="space-y-4">
           {error && (
             <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                {getErrorMessage(error)}
+              </AlertDescription>
             </Alert>
           )}
 
-          {/* OAuth Buttons */}
-          <div className="grid grid-cols-2 gap-3">
+          {formErrors.general && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                {formErrors.general}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* OAuth Providers */}
+          <div className="space-y-2">
             <Button
               variant="outline"
+              className="w-full"
               onClick={() => handleOAuthSignIn("google")}
-              disabled={isLoading}
-              className="w-full"
+              disabled={isGoogleLoading}
             >
-              <Chrome className="h-4 w-4 mr-2" />
-              Google
+              {isGoogleLoading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Chrome className="mr-2 h-4 w-4" />
+              )}
+              Continue with Google
             </Button>
+
             <Button
               variant="outline"
-              onClick={() => handleOAuthSignIn("github")}
-              disabled={isLoading}
               className="w-full"
+              onClick={() => handleOAuthSignIn("github")}
+              disabled={isGithubLoading}
             >
-              <Github className="h-4 w-4 mr-2" />
-              GitHub
+              {isGithubLoading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Github className="mr-2 h-4 w-4" />
+              )}
+              Continue with GitHub
             </Button>
           </div>
 
@@ -117,88 +158,77 @@ export default function SignInPage() {
               <Separator className="w-full" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">Or continue with email</span>
+              <span className="bg-background px-2 text-muted-foreground">
+                Or continue with email
+              </span>
             </div>
           </div>
 
           {/* Email/Password Form */}
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={handleCredentialsSignIn} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="john@example.com"
-                {...form.register("email")}
+                placeholder="Enter your email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                className={formErrors.email ? "border-red-500" : ""}
                 disabled={isLoading}
               />
-              {form.formState.errors.email && (
-                <p className="text-sm text-destructive">{form.formState.errors.email.message}</p>
+              {formErrors.email && (
+                <p className="text-sm text-red-600">{formErrors.email}</p>
               )}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Enter your password"
-                  {...form.register("password")}
-                  disabled={isLoading}
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                  onClick={() => setShowPassword(!showPassword)}
-                  disabled={isLoading}
-                >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
-              {form.formState.errors.password && (
-                <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>
+              <Input
+                id="password"
+                type="password"
+                placeholder="Enter your password"
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                className={formErrors.password ? "border-red-500" : ""}
+                disabled={isLoading}
+              />
+              {formErrors.password && (
+                <p className="text-sm text-red-600">{formErrors.password}</p>
               )}
             </div>
 
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Signing in...
                 </>
               ) : (
-                "Sign In"
+                <>
+                  <Mail className="mr-2 h-4 w-4" />
+                  Sign in with Email
+                </>
               )}
             </Button>
           </form>
-        </CardContent>
 
-        <CardFooter className="flex flex-col space-y-2">
-          <div className="text-sm text-center text-muted-foreground">
-            Don't have an account?{" "}
-            <Link 
-              href="/auth/signup" 
-              className="font-medium text-primary hover:underline"
-            >
-              Sign up
-            </Link>
-          </div>
-          <div className="text-sm text-center">
-            <Link 
-              href="/auth/forgot-password" 
-              className="text-muted-foreground hover:text-primary hover:underline"
+          <div className="text-center space-y-2">
+            <Link
+              href="/auth/forgot-password"
+              className="text-sm text-muted-foreground hover:text-primary"
             >
               Forgot your password?
             </Link>
+            
+            <div className="text-sm text-muted-foreground">
+              Don't have an account?{" "}
+              <Link href="/auth/signup" className="text-primary hover:underline font-medium">
+                Sign up
+              </Link>
+            </div>
           </div>
-        </CardFooter>
+        </CardContent>
       </Card>
     </div>
   )

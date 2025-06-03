@@ -22,15 +22,21 @@
 - [ ] Set up database monitoring
 - [ ] Add soft delete for important records
 
-### **3. Payment Processing**
-- [ ] Complete Stripe integration for credit card payments
-- [ ] Finish Helio crypto payment implementation
-- [ ] Add webhook handlers for payment events
-- [ ] Implement subscription management
-- [ ] Add payment failure handling
-- [ ] Set up recurring billing for subscriptions
-- [ ] Add invoice generation
-- [ ] Implement refund processing
+### **3. Payment Processing (Helio Crypto Payments)**
+- [x] Basic Helio Pay Link integration for one-time payments
+- [x] Helio Subscription webhook endpoints created
+- [x] Helio API client and service layer implemented
+- [x] Basic webhook handlers for payment events (STARTED, RENEWED, ENDED)
+- [ ] Complete Helio API authentication and environment variable setup
+- [ ] Test and debug Helio webhook signature verification
+- [ ] Implement comprehensive payment failure handling and retry logic
+- [ ] Add support for all cryptocurrencies (SOL, ETH, USDC, BTC, Base, Polygon)
+- [ ] Create invoice generation for Helio transactions
+- [ ] Implement refund processing through Helio API
+- [ ] Add comprehensive payment status tracking and verification
+- [ ] Enhance Helio webhook security and error handling
+- [ ] Add payment analytics and reporting
+- [ ] Test Helio integration on devnet before production
 
 ### **4. Core API Endpoints**
 - [ ] Complete user registration/login endpoints
@@ -164,30 +170,36 @@
 - [x] Container margin fixes
 - [x] Tag alignment improvements
 - [x] Verified badge component
+- [x] Helio payment integration foundation
+- [x] Helio API client and service layer
+- [x] Helio webhook endpoints
+- [x] Subscription modal with crypto payment option
 
 ## 📋 **CURRENT STATUS**
 
-**Overall Progress: ~15%**
+**Overall Progress: ~25%**
 
 **Completed:**
 - Frontend UI components and layout ✅
 - Database schema design ✅
 - Basic project structure ✅
+- Helio payment integration foundation ✅
 
 **In Progress:**
 - API endpoint development 🔄
 - Authentication system 🔄
+- Helio payment testing and refinement 🔄
 
 **Not Started:**
-- Payment processing 🔴
-- Model integrations 🔴
 - Production deployment 🔴
+- Model integrations 🔴
+- Advanced features 🔴
 
 ## 🎯 **NEXT IMMEDIATE STEPS**
 
-1. **Set up authentication system** (NextAuth.js)
-2. **Complete core API endpoints** (auth, users, models)
-3. **Implement payment processing** (Stripe + Helio)
+1. **Complete Helio payment setup** (Environment variables, testing)
+2. **Set up authentication system** (NextAuth.js)
+3. **Complete core API endpoints** (auth, users, models)
 4. **Add model sync functionality** (HF + Replicate)
 5. **Deploy to staging environment**
 
