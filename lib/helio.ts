@@ -151,7 +151,7 @@ export class HelioService {
   ) {
     try {
       // Convert plan price to appropriate units for Helio
-      const amount = this.convertPriceToHelio(plan.price, plan.unit)
+      const amount = this.convertPriceToHelio(plan.pricePerUnit, plan.unit)
       const currency = 'USDC' // Default to USDC, can be configurable
 
       const payLinkResponse = await this.client.createPayLink({
@@ -162,7 +162,7 @@ export class HelioService {
         customerEmail: userEmail,
         metadata: {
           planName: plan.name,
-          planType: plan.type,
+          planDescription: plan.description,
           ...metadata
         }
       })
@@ -194,7 +194,7 @@ export class HelioService {
     metadata?: Record<string, any>
   ) {
     try {
-      const amount = this.convertPriceToHelio(plan.price, plan.unit)
+      const amount = this.convertPriceToHelio(plan.pricePerUnit, plan.unit)
       const currency = 'USDC'
       const interval = this.getIntervalFromUnit(plan.unit)
 
@@ -207,7 +207,7 @@ export class HelioService {
         customerEmail: userEmail,
         metadata: {
           planName: plan.name,
-          planType: plan.type,
+          planDescription: plan.description,
           ...metadata
         }
       })
@@ -231,20 +231,15 @@ export class HelioService {
     }
   }
 
-  // Verify webhook signature
+  // Verify webhook signature using shared token
   verifyWebhookSignature(payload: string, signature: string, sharedToken: string): boolean {
-    // Implement webhook signature verification
-    // This would typically use HMAC-SHA256 with the shared token
     try {
-      const crypto = require('crypto')
-      const expectedSignature = crypto
-        .createHmac('sha256', sharedToken)
-        .update(payload)
-        .digest('hex')
-      
+      // Helio sends webhook with Authorization: Bearer SHARED_TOKEN
+      // The signature should match the Bearer token format
+      const expectedSignature = `Bearer ${sharedToken}`
       return signature === expectedSignature
     } catch (error) {
-      console.error('Error verifying webhook signature:', error)
+      console.error('Webhook signature verification failed:', error)
       return false
     }
   }
@@ -266,9 +261,9 @@ export class HelioService {
       amount: parseFloat(meta.amount) / 1000000, // Convert from minimal units
       currency: 'USDC', // Extracted from meta if available
       transactionSignature: meta.transactionSignature,
-      status: meta.transactionStatus === 'SUCCESS' ? 'completed' : 'failed',
+      status: this.mapTransactionStatus(meta.transactionStatus, event),
       paylinkId: transactionObject.paylinkId,
-      createdAt: new Date()
+      createdAt: new Date().toISOString()
     }
 
     // Store payment in database (implement based on your data layer)
@@ -291,6 +286,17 @@ export class HelioService {
     }
 
     return payment
+  }
+
+  // Map Helio transaction status to our status
+  private mapTransactionStatus(
+    transactionStatus: 'SUCCESS' | 'FAILED' | 'PENDING', 
+    event: 'CREATED' | 'STARTED' | 'RENEWED' | 'ENDED'
+  ): 'CREATED' | 'STARTED' | 'RENEWED' | 'ENDED' | 'FAILED' {
+    if (transactionStatus === 'FAILED') {
+      return 'FAILED'
+    }
+    return event
   }
 
   // Handle one-time payment completion
@@ -331,30 +337,27 @@ export class HelioService {
     // Update subscription status
   }
 
-  // Convert pricing to Helio-compatible format
+  // Convert price to Helio minimal units based on currency
   private convertPriceToHelio(price: number, unit: string): number {
-    // Convert different pricing units to USDC amount
-    switch (unit) {
-      case '1k tokens':
-        return price * 1000 // Assuming price is per 1k tokens
-      case '1M tokens':
-        return price * 1000000
-      case 'month':
-        return price
-      case 'request':
-        return price
-      default:
-        return price
-    }
+    // Convert USD price to USDC minimal units (6 decimals)
+    const currency = HELIO_CONFIG.DEFAULT_CURRENCY
+    const decimals = HELIO_CONFIG.CURRENCY_DECIMALS[currency as keyof typeof HELIO_CONFIG.CURRENCY_DECIMALS] || 6
+    
+    // For USDC: $1.00 = 1,000,000 minimal units (6 decimals)
+    return Math.round(price * Math.pow(10, decimals))
   }
 
-  // Get subscription interval from pricing unit
+  // Get interval mapping for subscriptions
   private getIntervalFromUnit(unit: string): 'daily' | 'weekly' | 'monthly' | 'yearly' {
-    if (unit.includes('day')) return 'daily'
-    if (unit.includes('week')) return 'weekly'
-    if (unit.includes('month')) return 'monthly'
-    if (unit.includes('year')) return 'yearly'
-    return 'monthly' // Default
+    const unitLower = unit.toLowerCase()
+    
+    if (unitLower.includes('hour')) return 'daily' // Convert hourly to daily
+    if (unitLower.includes('day')) return 'daily'
+    if (unitLower.includes('week')) return 'weekly'
+    if (unitLower.includes('month')) return 'monthly'
+    if (unitLower.includes('year')) return 'yearly'
+    
+    return 'monthly' // Default fallback
   }
 
   // Get payment status

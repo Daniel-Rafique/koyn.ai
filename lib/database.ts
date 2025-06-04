@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import { Model, ModelCategory, LicenseType, PricingPlan, Subscription } from './types'
+import { setupDatabaseMonitoring } from './database-monitor'
 
 declare global {
   var prisma: PrismaClient | undefined
@@ -10,6 +11,9 @@ export const prisma = globalThis.prisma || new PrismaClient()
 if (process.env.NODE_ENV !== 'production') {
   globalThis.prisma = prisma
 }
+
+// Initialize database monitoring
+setupDatabaseMonitoring()
 
 // Interface that matches what we get from model sync
 interface DatabaseModel {

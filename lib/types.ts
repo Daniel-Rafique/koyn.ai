@@ -346,15 +346,47 @@ export interface PayoutMethod {
 export interface HelioPayment {
   id: string;
   userId: string;
-  orderId: string;
-  payLink: string;
+  modelId: string;
   amount: number;
   currency: string;
   status: 'CREATED' | 'STARTED' | 'RENEWED' | 'ENDED' | 'FAILED';
-  transactionId?: string;
+  transactionSignature?: string;
+  paylinkId?: string;
   createdAt: string;
-  expiresAt: string;
-  metadata: Record<string, any>;
+  metadata?: Record<string, any>;
+}
+
+export interface HelioWebhookPayload {
+  event: 'CREATED' | 'STARTED' | 'RENEWED' | 'ENDED';
+  transactionObject: {
+    id: string;
+    paylinkId: string;
+    quantity: number;
+    fee?: string;
+    createdAt: string;
+    paymentType: string;
+    meta: {
+      id: string;
+      amount: string;
+      senderPK: string;
+      recipientPK: string;
+      transactionType: string;
+      transactionSignature: string;
+      transactionStatus: 'SUCCESS' | 'FAILED' | 'PENDING';
+      customerDetails?: {
+        email?: string;
+        discordUsername?: string;
+        twitterUsername?: string;
+        fullName?: string;
+      };
+      productDetails?: any;
+      totalAmount: string;
+      currency: {
+        id: string;
+        blockchain?: any;
+      };
+    };
+  };
 }
 
 export interface HelioSubscription {

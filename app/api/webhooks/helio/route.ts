@@ -8,109 +8,95 @@ import { helioApiClient } from "@/lib/helio"
 export async function POST(request: NextRequest) {
   try {
     const body = await request.text()
-    const signature = request.headers.get('helio-signature')
+    const authHeader = request.headers.get('authorization')
 
-    // TODO: Implement webhook signature verification when available
-    // For now, we'll process all webhooks (add proper verification in production)
+    // Verify webhook signature using Bearer token
+    const sharedToken = process.env.HELIO_WEBHOOK_SECRET
     
-    const webhookData = JSON.parse(body)
-
-    const { type, data } = webhookData
-
-    switch (type) {
-      case "PAYMENT_COMPLETED":
-        await handlePaymentCompleted(data)
-        break
-        
-      case "PAYMENT_FAILED":
-        await handlePaymentFailed(data)
-        break
-        
-      case "PAYMENT_REFUNDED":
-        await handlePaymentRefunded(data)
-        break
-        
-      default:
-        console.log(`Unhandled Helio webhook type: ${type}`)
+    if (!sharedToken) {
+      console.error('HELIO_WEBHOOK_SECRET not configured')
+      return NextResponse.json(
+        { error: 'Webhook secret not configured' },
+        { status: 500 }
+      )
     }
 
-    return NextResponse.json({ success: true })
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.error('Missing or invalid Authorization header')
+      return NextResponse.json(
+        { error: 'Missing or invalid authorization' },
+        { status: 401 }
+      )
+    }
+
+    // Verify the signature matches our shared token
+    const isValidSignature = helioService.verifyWebhookSignature(body, authHeader, sharedToken)
+    
+    if (!isValidSignature) {
+      console.error('Invalid webhook signature')
+      return NextResponse.json(
+        { error: 'Invalid signature' },
+        { status: 401 }
+      )
+    }
+
+    // Parse webhook payload
+    const webhookData: HelioWebhookPayload = JSON.parse(body)
+    
+    console.log('🪙 Helio webhook received:', {
+      event: webhookData.event,
+      transactionId: webhookData.transactionObject.id,
+      paylinkId: webhookData.transactionObject.paylinkId,
+      status: webhookData.transactionObject.meta.transactionStatus
+    })
+
+    // Process the webhook through our service
+    const payment = await helioService.processWebhook(webhookData)
+
+    // Handle specific payment events
+    switch (webhookData.event) {
+      case "CREATED":
+        await handlePaymentCompleted(payment)
+        break
+      default:
+        console.log(`Helio webhook event '${webhookData.event}' processed successfully`)
+    }
+
+    return NextResponse.json({ 
+      success: true,
+      message: 'Webhook processed successfully',
+      paymentId: payment.id
+    })
 
   } catch (error) {
     console.error("Helio webhook error:", error)
     return NextResponse.json(
-      { error: "Webhook processing failed" },
+      { 
+        error: "Webhook processing failed",
+        message: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     )
   }
 }
 
-async function handlePaymentCompleted(data: any) {
+async function handlePaymentCompleted(payment: any) {
   try {
-    const { metadata } = data
+    console.log('💰 Processing completed payment:', payment.id)
     
-    if (metadata.subscriptionType === "model_access") {
-      // Create subscription for model access
-      const durationHours = getDurationInHours(metadata.duration)
-      
-      const subscription = await subscriptionDb.createSubscription({
-        userId: metadata.userId,
-        modelId: metadata.modelId,
-        planId: metadata.planId,
-        durationHours,
-        paymentMethod: "helio",
-        transactionId: data.id
-      })
-
-      console.log(`Created subscription ${subscription.id} for user ${metadata.userId}`)
-      
-      // TODO: Send confirmation email to user
-      // TODO: Update user's API access immediately
-    }
-
+    // TODO: Implement payment completion logic:
+    // 1. Create/update subscription record in database
+    // 2. Grant user access to the model
+    // 3. Update creator earnings
+    // 4. Send confirmation email
+    // 5. Log analytics event
+    
+    // For now, just log the event
+    console.log(`✅ Payment ${payment.id} processed for model ${payment.modelId}`)
+    
   } catch (error) {
-    console.error("Error handling payment completion:", error)
+    console.error(`Failed to process payment completion for ${payment.id}:`, error)
     throw error
-  }
-}
-
-async function handlePaymentFailed(data: any) {
-  try {
-    console.log(`Payment failed for transaction ${data.id}`)
-    
-    // TODO: Log failed payment attempt
-    // TODO: Send notification to user about failed payment
-    
-  } catch (error) {
-    console.error("Error handling payment failure:", error)
-  }
-}
-
-async function handlePaymentRefunded(data: any) {
-  try {
-    const { metadata } = data
-    
-    if (metadata.subscriptionType === "model_access") {
-      // Find and cancel the subscription
-      // TODO: Add method to cancel subscription by transaction ID
-      console.log(`Refund processed for transaction ${data.id}`)
-      
-      // TODO: Immediately revoke API access
-      // TODO: Send refund confirmation email
-    }
-
-  } catch (error) {
-    console.error("Error handling payment refund:", error)
-  }
-}
-
-function getDurationInHours(duration: string): number {
-  switch (duration) {
-    case "hourly": return 1
-    case "daily": return 24
-    case "weekly": return 168 // 24 * 7
-    case "monthly": return 720 // 24 * 30
-    default: return 24
   }
 }
 

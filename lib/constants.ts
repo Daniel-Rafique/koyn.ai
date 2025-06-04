@@ -152,12 +152,27 @@ export const STATUS_MESSAGES = {
 
 // Helio Payment Configuration
 export const HELIO_CONFIG = {
-  API_BASE_URL: process.env.HELIO_API_URL || "https://api.hel.io",
+  PRODUCTION_API: "https://api.hel.io/v1",
+  DEVELOPMENT_API: "https://api.dev.hel.io/v1",
   WEBHOOK_SECRET: process.env.HELIO_WEBHOOK_SECRET,
   SUPPORTED_CURRENCIES: ["SOL", "USDC", "ETH", "BTC", "MATIC", "AVAX"],
   DEFAULT_CURRENCY: "USDC",
   PAYMENT_EXPIRY_MINUTES: 30,
-  SUBSCRIPTION_RENEWAL_BUFFER_HOURS: 24
+  SUBSCRIPTION_RENEWAL_BUFFER_HOURS: 24,
+  // Webhook events
+  WEBHOOK_EVENTS: {
+    PAYLINK: ["CREATED"],
+    SUBSCRIPTION: ["STARTED", "RENEWED", "ENDED"]
+  },
+  // Currency decimals for proper amount conversion
+  CURRENCY_DECIMALS: {
+    SOL: 9,
+    USDC: 6,
+    ETH: 18,
+    BTC: 8,
+    MATIC: 18,
+    AVAX: 18
+  }
 } as const
 
 // Feature Flags
