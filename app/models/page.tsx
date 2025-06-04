@@ -15,13 +15,13 @@ import { ModelFilters, ModelCategory } from "@/lib/types"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 
-// Simplified model interface for the UI
-interface SimpleModel {
+// Database model interface
+interface DatabaseModel {
   id: string;
   name: string;
   slug: string;
   description: string;
-  category: ModelCategory;
+  category: string;
   architecture: string;
   tags: string[];
   creator: {
@@ -32,7 +32,7 @@ interface SimpleModel {
   pricing: Array<{
     id: string;
     name: string;
-    type: 'free' | 'premium' | 'freemium';
+    type: string;
     price: number;
     unit: string;
     active: boolean;
@@ -42,110 +42,16 @@ interface SimpleModel {
   downloadCount: number;
   featured: boolean;
   license: string;
-  createdAt: Date;
+  createdAt: string;
 }
-
-// Mock data - replace with API calls
-const mockModels: SimpleModel[] = [
-  {
-    id: "1",
-    name: "LLaMA 2 70B Chat",
-    slug: "llama-2-70b-chat",
-    description: "A large language model fine-tuned for conversational use cases with exceptional reasoning capabilities.",
-    category: ModelCategory.NLP,
-    architecture: "LLaMA",
-    tags: ["chat", "reasoning", "multilingual"],
-    creator: {
-      id: "creator-1",
-      displayName: "Meta AI",
-      verified: true,
-    },
-    pricing: [
-      {
-        id: "plan-1",
-        name: "Pay per Use",
-        type: "premium",
-        price: 0.02,
-        unit: "1k tokens",
-        active: true
-      }
-    ],
-    rating: 4.8,
-    reviewCount: 234,
-    downloadCount: 125000,
-    featured: true,
-    license: "commercial",
-    createdAt: new Date()
-  },
-  {
-    id: "2",
-    name: "CLIP Vision Encoder",
-    slug: "clip-vision-encoder",
-    description: "Connects text and images in a single embedding space for powerful multimodal applications.",
-    category: ModelCategory.CV,
-    architecture: "Transformer",
-    tags: ["multimodal", "embeddings", "zero-shot"],
-    creator: {
-      id: "creator-2",
-      displayName: "OpenAI",
-      verified: true,
-    },
-    pricing: [
-      {
-        id: "plan-2",
-        name: "Free Tier",
-        type: "free",
-        price: 0,
-        unit: "request",
-        active: true
-      }
-    ],
-    rating: 4.6,
-    reviewCount: 156,
-    downloadCount: 89000,
-    featured: true,
-    license: "open-source",
-    createdAt: new Date()
-  },
-  {
-    id: "3",
-    name: "Whisper Large V3",
-    slug: "whisper-large-v3",
-    description: "State-of-the-art speech recognition model supporting 99 languages with high accuracy.",
-    category: ModelCategory.AUDIO,
-    architecture: "Transformer",
-    tags: ["speech-to-text", "multilingual", "robust"],
-    creator: {
-      id: "creator-2",
-      displayName: "OpenAI",
-      verified: true,
-    },
-    pricing: [
-      {
-        id: "plan-3",
-        name: "Freemium",
-        type: "freemium",
-        price: 0.006,
-        unit: "minute",
-        active: true
-      }
-    ],
-    rating: 4.9,
-    reviewCount: 89,
-    downloadCount: 67000,
-    featured: false,
-    license: "open-source",
-    createdAt: new Date()
-  }
-]
 
 const categories = [
   { value: "all", label: "All Categories" },
-  { value: "nlp", label: "Natural Language Processing" },
-  { value: "computer-vision", label: "Computer Vision" },
-  { value: "audio", label: "Audio Processing" },
-  { value: "multimodal", label: "Multimodal" },
-  { value: "reinforcement-learning", label: "Reinforcement Learning" }
+  { value: "NLP", label: "Natural Language Processing" },
+  { value: "COMPUTER_VISION", label: "Computer Vision" },
+  { value: "AUDIO", label: "Audio Processing" },
+  { value: "MULTIMODAL", label: "Multimodal" },
+  { value: "REINFORCEMENT_LEARNING", label: "Reinforcement Learning" }
 ]
 
 const sortOptions = [
@@ -173,172 +79,75 @@ export default function ModelsPage() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
   const [showFilters, setShowFilters] = useState(false)
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const [filters, setFilters] = useState<ModelFilters>({
     sortBy: 'popularity'
   })
-  const [models, setModels] = useState(mockModels)
+  const [models, setModels] = useState<DatabaseModel[]>([])
+  const [totalModels, setTotalModels] = useState(0)
 
   // Debounced search query
   const debouncedSearchQuery = useDebounce(searchTerm, 300)
 
-  // Fetch real models
+  // Fetch models from API
   useEffect(() => {
     const fetchModels = async () => {
       setIsLoading(true)
       try {
-        // You can call your sync API to get fresh models
-        // const response = await fetch('/api/models/sync', {
-        //   method: 'POST',
-        //   headers: { 'Content-Type': 'application/json' },
-        //   body: JSON.stringify({ source: 'all' })
-        // })
-        // const data = await response.json()
+        const params = new URLSearchParams()
+        if (debouncedSearchQuery) params.set('search', debouncedSearchQuery)
+        if (selectedCategory !== 'all') params.set('category', selectedCategory)
+        if (selectedSort) params.set('sort', selectedSort)
+        if (selectedPricing !== 'all') params.set('pricing', selectedPricing)
         
-        // For now, keep using mock data but this is where you'd use real data
-        setIsLoading(false)
+        const response = await fetch(`/api/models?${params.toString()}`)
+        if (response.ok) {
+          const data = await response.json()
+          setModels(data.models || [])
+          setTotalModels(data.total || 0)
+        } else {
+          console.error('Failed to fetch models')
+        }
       } catch (error) {
         console.error('Error fetching models:', error)
+      } finally {
         setIsLoading(false)
       }
     }
 
     fetchModels()
-  }, [])
-
-  // Filter and search logic
-  useEffect(() => {
-    let filteredModels = [...mockModels]
-
-    // Apply search filter
-    if (debouncedSearchQuery) {
-      const query = debouncedSearchQuery.toLowerCase()
-      filteredModels = filteredModels.filter((model: SimpleModel) =>
-        model.name.toLowerCase().includes(query) ||
-        model.description.toLowerCase().includes(query) ||
-        model.creator.displayName.toLowerCase().includes(query) ||
-        model.tags.some((tag: string) => tag.toLowerCase().includes(query))
-      )
-    }
-
-    // Apply category filter
-    if (selectedCategory !== "all") {
-      filteredModels = filteredModels.filter((model: SimpleModel) => model.category === selectedCategory)
-    }
-
-    // Apply pricing filter
-    if (selectedPricing !== "all") {
-      if (selectedPricing === "free") {
-        filteredModels = filteredModels.filter((model: SimpleModel) => model.pricing.some((plan: any) => plan.type === "free"))
-      } else if (selectedPricing === "paid") {
-        filteredModels = filteredModels.filter((model: SimpleModel) => model.pricing.some((plan: any) => plan.type === "premium" && !plan.active))
-      } else if (selectedPricing === "freemium") {
-        filteredModels = filteredModels.filter((model: SimpleModel) => model.pricing.some((plan: any) => plan.type === "freemium" && plan.active))
-      }
-    }
-
-    // Advanced filters
-    if (filters.licenses?.length) {
-      filteredModels = filteredModels.filter((model: SimpleModel) => filters.licenses!.includes(model.license as any))
-    }
-
-    if (filters.architectures?.length) {
-      filteredModels = filteredModels.filter((model: SimpleModel) => filters.architectures!.includes(model.architecture as any))
-    }
-
-    if (filters.minRating) {
-      filteredModels = filteredModels.filter((model: SimpleModel) => model.rating >= filters.minRating!)
-    }
-
-    // Apply sorting
-    switch (selectedSort) {
-      case "rating":
-        filteredModels.sort((a, b) => b.rating - a.rating)
-        break
-      case "downloads":
-        filteredModels.sort((a, b) => b.downloadCount - a.downloadCount)
-        break
-      case "recent":
-        filteredModels.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-        break
-      case "price-low":
-        filteredModels.sort((a, b) => {
-          const aPrice = Math.min(...a.pricing.map((p: any) => p.price))
-          const bPrice = Math.min(...b.pricing.map((p: any) => p.price))
-          return aPrice - bPrice
-        })
-        break
-      case "price-high":
-        filteredModels.sort((a, b) => {
-          const aPrice = Math.max(...a.pricing.map((p: any) => p.price))
-          const bPrice = Math.max(...b.pricing.map((p: any) => p.price))
-          return bPrice - aPrice
-        })
-        break
-      default: // popularity
-        filteredModels.sort((a, b) => b.downloadCount - a.downloadCount)
-    }
-
-    setModels(filteredModels)
-  }, [debouncedSearchQuery, selectedCategory, selectedSort, selectedPricing, filters])
+  }, [debouncedSearchQuery, selectedCategory, selectedSort, selectedPricing])
 
   // Active filters for display
   const activeFilters = useMemo(() => {
     const active: Array<{ key: string; value: string; label: string }> = []
     
     if (selectedCategory !== "all") {
-      const category = MODEL_CATEGORIES.find((c: any) => c.id === selectedCategory)
+      const category = categories.find((c: any) => c.value === selectedCategory)
       if (category) {
-        active.push({ key: 'category', value: selectedCategory, label: category.name })
+        active.push({ key: 'category', value: selectedCategory, label: category.label })
       }
     }
 
-    filters.licenses?.forEach((license: any) => {
-      active.push({ key: 'license', value: license, label: license })
-    })
-
-    if (filters.pricing && typeof filters.pricing === 'string') {
-      active.push({ key: 'pricing', value: filters.pricing, label: filters.pricing })
-    }
-
-    filters.architectures?.forEach((arch: any) => {
-      active.push({ key: 'architecture', value: arch, label: arch })
-    })
-
-    if (filters.minRating) {
-      active.push({ key: 'minRating', value: filters.minRating.toString(), label: `${filters.minRating}+ stars` })
+    if (selectedPricing !== "all") {
+      active.push({ key: 'pricing', value: selectedPricing, label: selectedPricing })
     }
 
     return active
-  }, [selectedCategory, filters])
+  }, [selectedCategory, selectedPricing])
 
   // Handle filter changes
-  const handleFilterChange = (newFilters: Partial<ModelFilters>) => {
-    setFilters((prev: any) => ({ ...prev, ...newFilters }))
-  }
-
   const removeFilter = (key: string, value?: string) => {
     if (key === 'category') {
       setSelectedCategory("all")
-    } else if (key === 'minRating') {
-      setFilters((prev: any) => ({ ...prev, minRating: undefined }))
-    } else {
-      setFilters((prev: any) => {
-        const filterValue = prev[key as keyof ModelFilters];
-        if (Array.isArray(filterValue)) {
-          return {
-            ...prev,
-            [key]: filterValue.filter((v: any) => v !== value)
-          };
-        }
-        return prev;
-      })
+    } else if (key === 'pricing') {
+      setSelectedPricing("all")
     }
   }
 
   const clearAllFilters = () => {
     setSelectedCategory("all")
-    setFilters({ sortBy: 'popularity' })
+    setSelectedPricing("all")
     setSearchTerm("")
   }
 
@@ -351,15 +160,15 @@ export default function ModelsPage() {
     return num.toString()
   }
 
-  const ModelCard = ({ model }: { model: SimpleModel }) => (
+  const ModelCard = ({ model }: { model: DatabaseModel }) => (
     <Card className="group cursor-pointer hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
       <CardHeader className="pb-3">
         <div className="flex justify-between items-start mb-2">
           <Badge variant="secondary" className="capitalize">
-            {model.category.replace("-", " ")}
+            {model.category.replace("_", " ").toLowerCase()}
           </Badge>
           <div className="flex gap-1">
-            {model.pricing.some((plan: any) => plan.type === "free") && (
+            {model.pricing.some((plan: any) => plan.type === "FREE") && (
               <Badge variant="outline" className="text-xs">Free Tier</Badge>
             )}
             {model.featured && (
@@ -394,7 +203,7 @@ export default function ModelsPage() {
             </Badge>
           )}
         </div>
-        
+
         <div className="flex items-center justify-between text-sm">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-1">
@@ -413,13 +222,51 @@ export default function ModelsPage() {
             </Link>
           </div>
         </div>
-        
+
         <div className="flex items-center justify-between pt-2 border-t">
-          <span className="font-medium text-primary">{model.pricing.find((p: any) => p.active)?.name || "Contact for Pricing"}</span>
+          <span className="font-medium text-primary">
+            {model.pricing.find((p: any) => p.active)?.name || "Contact for Pricing"}
+          </span>
         </div>
       </CardContent>
     </Card>
   )
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="container mx-auto px-4 lg:px-8 py-8">
+          <div className="space-y-6 mb-8">
+            <div>
+              <h1 className="text-3xl lg:text-4xl font-bold">AI Model Marketplace</h1>
+              <p className="text-muted-foreground mt-2">
+                Discover and integrate cutting-edge AI models from top creators worldwide
+              </p>
+            </div>
+          </div>
+          <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {[...Array(8)].map((_, i) => (
+              <Card key={i}>
+                <CardHeader>
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-6 w-full" />
+                  <Skeleton className="h-4 w-24" />
+                </CardHeader>
+                <CardContent>
+                  <Skeleton className="h-12 w-full mb-4" />
+                  <div className="flex gap-2 mb-4">
+                    <Skeleton className="h-6 w-16" />
+                    <Skeleton className="h-6 w-20" />
+                  </div>
+                  <Skeleton className="h-8 w-full" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -489,7 +336,7 @@ export default function ModelsPage() {
 
             <div className="flex justify-between items-center">
               <div className="text-sm text-muted-foreground">
-                Showing {models.length} of {mockModels.length} models
+                Showing {models.length} of {totalModels} models
               </div>
               <div className="flex items-center gap-2">
                 <Button

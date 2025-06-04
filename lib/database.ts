@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client'
-import { Model, ModelCategory, License, PricingPlan, Subscription } from './types'
+import { Model, ModelCategory, LicenseType, PricingPlan, Subscription } from './types'
 
 declare global {
   var prisma: PrismaClient | undefined
@@ -11,11 +11,71 @@ if (process.env.NODE_ENV !== 'production') {
   globalThis.prisma = prisma
 }
 
+// Interface that matches what we get from model sync
+interface DatabaseModel {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  longDescription?: string;
+  category: string;
+  architecture: string;
+  tasks: string[];
+  modelSize: string;
+  contextLength?: string;
+  inputModalities: string[];
+  outputModalities: string[];
+  averageLatency: number;
+  license: string;
+  version: string;
+  tags: string[];
+  rating: number;
+  reviewCount: number;
+  downloadCount: number;
+  apiCallCount: number;
+  featured: boolean;
+  status: string;
+  creator: {
+    id: string;
+    userId: string;
+    displayName: string;
+    bio: string;
+    verified: boolean;
+    rating: number;
+    totalEarnings: number;
+    totalDownloads: number;
+  };
+  pricing: Array<{
+    id: string;
+    name: string;
+    type: string;
+    price: number;
+    unit: string;
+    requestsPerMonth?: number;
+    requestsPerMinute?: number;
+    maxBatchSize?: number;
+    features: string[];
+    supportLevel: string;
+    stripePriceId?: string;
+    active: boolean;
+  }>;
+  benchmarks?: Array<{
+    name: string;
+    dataset: string;
+    metric: string;
+    value: number;
+    unit?: string;
+    description?: string;
+  }>;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 // Database operations for Models
 export class ModelDatabase {
   
   // Save synced models to database
-  async saveModels(models: Model[]): Promise<void> {
+  async saveModels(models: DatabaseModel[]): Promise<void> {
     for (const model of models) {
       try {
         // First ensure creator profile exists
@@ -28,7 +88,7 @@ export class ModelDatabase {
             name: model.name,
             description: model.description,
             longDescription: model.longDescription,
-            category: this.mapCategoryToDb(model.category),
+            category: this.mapCategoryToDb(model.category as any),
             architecture: model.architecture,
             tasks: model.tasks,
             modelSize: model.modelSize,
@@ -36,7 +96,7 @@ export class ModelDatabase {
             inputModalities: model.inputModalities,
             outputModalities: model.outputModalities,
             averageLatency: model.averageLatency,
-            license: this.mapLicenseToDb(model.license),
+            license: this.mapLicenseToDb(model.license as any),
             version: model.version,
             tags: model.tags,
             rating: model.rating,
@@ -57,7 +117,7 @@ export class ModelDatabase {
             description: model.description,
             longDescription: model.longDescription,
             creatorId: model.creator.id,
-            category: this.mapCategoryToDb(model.category),
+            category: this.mapCategoryToDb(model.category as any),
             architecture: model.architecture,
             tasks: model.tasks,
             modelSize: model.modelSize,
@@ -65,7 +125,7 @@ export class ModelDatabase {
             inputModalities: model.inputModalities,
             outputModalities: model.outputModalities,
             averageLatency: model.averageLatency,
-            license: this.mapLicenseToDb(model.license),
+            license: this.mapLicenseToDb(model.license as any),
             version: model.version,
             tags: model.tags,
             rating: model.rating,
@@ -81,7 +141,7 @@ export class ModelDatabase {
         })
 
         // Save pricing plans
-        await this.savePricingPlans(model.id, model.pricing)
+        await this.savePricingPlans(model.id, model.pricing as any)
         
         // Save benchmarks
         if (model.benchmarks && model.benchmarks.length > 0) {
@@ -184,7 +244,6 @@ export class ModelDatabase {
       },
       create: {
         id: creator.id,
-        userId: creator.userId,
         displayName: creator.displayName,
         bio: creator.bio,
         verified: creator.verified,
@@ -206,7 +265,7 @@ export class ModelDatabase {
     })
   }
 
-  private async savePricingPlans(modelId: string, plans: PricingPlan[]): Promise<void> {
+  private async savePricingPlans(modelId: string, plans: any[]): Promise<void> {
     // Delete existing pricing plans
     await prisma.pricingPlan.deleteMany({
       where: { modelId }
@@ -272,7 +331,7 @@ export class ModelDatabase {
     return mapping[category] || 'OTHER'
   }
 
-  private mapLicenseToDb(license: License): any {
+  private mapLicenseToDb(license: LicenseType): any {
     const mapping: Record<string, string> = {
       'open-source': 'OPEN_SOURCE',
       'commercial': 'COMMERCIAL',

@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { signIn, getSession } from "next-auth/react"
+import { useState, useEffect } from "react"
+import { signIn, getSession, getProviders } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -18,6 +18,7 @@ export default function SignInPage() {
   const callbackUrl = searchParams.get("callbackUrl") || "/"
   const error = searchParams.get("error")
   
+  const [providers, setProviders] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const [isGithubLoading, setIsGithubLoading] = useState(false)
@@ -26,6 +27,11 @@ export default function SignInPage() {
     password: "",
   })
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
+
+  // Fetch available providers on component mount
+  useEffect(() => {
+    getProviders().then(setProviders)
+  }, [])
 
   const handleCredentialsSignIn = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -89,10 +95,17 @@ export default function SignInPage() {
         return "Could not create account"
       case "Callback":
         return "Authentication callback error"
+      case "OAuthSignin":
+        return "OAuth provider not configured. Please use email sign in or contact support."
       default:
         return "An error occurred during sign in"
     }
   }
+
+  // Check if OAuth providers are available
+  const hasGoogleProvider = providers?.google
+  const hasGithubProvider = providers?.github
+  const hasOAuthProviders = hasGoogleProvider || hasGithubProvider
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 px-4">
@@ -122,47 +135,65 @@ export default function SignInPage() {
             </Alert>
           )}
 
-          {/* OAuth Providers */}
-          <div className="space-y-2">
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => handleOAuthSignIn("google")}
-              disabled={isGoogleLoading}
-            >
-              {isGoogleLoading ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Chrome className="mr-2 h-4 w-4" />
-              )}
-              Continue with Google
-            </Button>
+          {/* OAuth Providers - Only show if configured */}
+          {hasOAuthProviders && (
+            <>
+              <div className="space-y-2">
+                {hasGoogleProvider && (
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => handleOAuthSignIn("google")}
+                    disabled={isGoogleLoading}
+                  >
+                    {isGoogleLoading ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Chrome className="mr-2 h-4 w-4" />
+                    )}
+                    Continue with Google
+                  </Button>
+                )}
 
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => handleOAuthSignIn("github")}
-              disabled={isGithubLoading}
-            >
-              {isGithubLoading ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Github className="mr-2 h-4 w-4" />
-              )}
-              Continue with GitHub
-            </Button>
-          </div>
+                {hasGithubProvider && (
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => handleOAuthSignIn("github")}
+                    disabled={isGithubLoading}
+                  >
+                    {isGithubLoading ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Github className="mr-2 h-4 w-4" />
+                    )}
+                    Continue with GitHub
+                  </Button>
+                )}
+              </div>
 
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <Separator className="w-full" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
-                Or continue with email
-              </span>
-            </div>
-          </div>
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <Separator className="w-full" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">
+                    Or continue with email
+                  </span>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Show info message if no OAuth providers are configured */}
+          {!hasOAuthProviders && providers && (
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                OAuth providers are not configured yet. You can sign in with email and password.
+              </AlertDescription>
+            </Alert>
+          )}
 
           {/* Email/Password Form */}
           <form onSubmit={handleCredentialsSignIn} className="space-y-4">

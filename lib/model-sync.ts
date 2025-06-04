@@ -1,4 +1,4 @@
-import { Model, ModelCategory, License, PricingPlan } from './types'
+import { Model, ModelCategory, LicenseType, PricingPlan, ModelArchitecture, PricingUnit } from './types'
 import { apiClient } from './api'
 
 interface HuggingFaceModel {
@@ -65,6 +65,7 @@ export class ModelSyncService {
   // Transform Hugging Face model to our format
   private transformHuggingFaceModel(hfModel: HuggingFaceModel): Model {
     const category = this.mapPipelineTagToCategory(hfModel.pipeline_tag)
+    const authorName = hfModel.author || hfModel.id.split('/')[0] || 'Unknown'
     
     return {
       id: `hf_${hfModel.id.replace('/', '_')}`,
@@ -72,40 +73,40 @@ export class ModelSyncService {
       slug: hfModel.id.replace('/', '-').toLowerCase(),
       description: `${category} model from Hugging Face`,
       longDescription: `Advanced ${category} model available through Hugging Face Hub`,
-      creatorId: `hf_${hfModel.author}`,
+      creatorId: `hf_${authorName}`,
       creator: {
-        id: `hf_${hfModel.author}`,
-        userId: `hf_${hfModel.author}`,
-        displayName: hfModel.author,
+        id: `hf_${authorName}`,
+        userId: `hf_${authorName}`,
+        description: authorName,
         bio: 'Hugging Face Creator',
         verified: true,
         rating: 4.5,
         totalEarnings: 0,
         totalDownloads: hfModel.downloads,
-        createdAt: new Date()
-      },
+        createdAt: new Date().toISOString()
+      } as any,
       category,
       architecture: this.extractArchitecture(hfModel.tags),
-      tasks: [hfModel.pipeline_tag],
+      supportedTasks: [hfModel.pipeline_tag].filter(Boolean),
       modelSize: this.extractModelSize(hfModel.tags),
-      inputModalities: this.getInputModalities(hfModel.pipeline_tag),
-      outputModalities: this.getOutputModalities(hfModel.pipeline_tag),
       benchmarks: [],
-      averageLatency: 100,
       license: this.mapLicense(hfModel.tags),
-      version: '1.0.0',
+      currentVersion: '1.0.0',
       versions: [],
       tags: hfModel.tags.slice(0, 10),
-      pricing: this.generateFlexiblePricing(`hf_${hfModel.id.replace('/', '_')}`),
-      rating: Math.min(4.8, 3.0 + (hfModel.likes / 1000)),
-      reviewCount: Math.floor(hfModel.likes / 10),
-      downloadCount: hfModel.downloads,
-      apiCallCount: 0,
-      status: 'published' as const,
-      featured: hfModel.downloads > 10000,
+      pricingPlans: this.generateFlexiblePricing(`hf_${hfModel.id.replace('/', '_')}`),
+      averageRating: Math.min(4.8, 3.0 + (hfModel.likes / 1000)),
+      totalReviews: Math.floor(hfModel.likes / 10),
+      downloads: hfModel.downloads,
+      likes: hfModel.likes,
+      views: 0,
+      isFreeTier: false,
+      isPublished: true,
+      isFeatured: hfModel.downloads > 10000,
       modelFiles: [],
-      createdAt: new Date(hfModel.createdAt),
-      updatedAt: new Date(hfModel.lastModified)
+      sampleFiles: [],
+      createdAt: hfModel.createdAt,
+      updatedAt: hfModel.lastModified
     }
   }
 
@@ -123,36 +124,36 @@ export class ModelSyncService {
       creator: {
         id: `rep_${owner}`,
         userId: `rep_${owner}`,
-        displayName: owner,
+        description: owner,
         bio: 'Replicate Creator',
         verified: true,
         rating: 4.6,
         totalEarnings: 0,
         totalDownloads: 0,
-        createdAt: new Date()
-      },
+        createdAt: new Date().toISOString()
+      } as any,
       category: 'other' as ModelCategory,
-      architecture: 'Unknown',
-      tasks: ['general'],
+      architecture: ModelArchitecture.TRANSFORMER,
+      supportedTasks: ['general'],
       modelSize: 'Unknown',
-      inputModalities: ['text'],
-      outputModalities: ['text'],
       benchmarks: [],
-      averageLatency: 200,
-      license: 'custom' as License,
-      version: repModel.latest_version?.id || '1.0.0',
+      license: 'custom' as LicenseType,
+      currentVersion: repModel.latest_version?.id || '1.0.0',
       versions: [],
       tags: [],
-      pricing: this.generateFlexiblePricing(`rep_${owner}_${name}`),
-      rating: 4.0,
-      reviewCount: 0,
-      downloadCount: 0,
-      apiCallCount: 0,
-      status: 'published' as const,
-      featured: false,
+      pricingPlans: this.generateFlexiblePricing(`rep_${owner}_${name}`),
+      averageRating: 4.0,
+      totalReviews: 0,
+      downloads: 0,
+      likes: 0,
+      views: 0,
+      isFreeTier: false,
+      isPublished: true,
+      isFeatured: false,
       modelFiles: [],
-      createdAt: new Date(),
-      updatedAt: new Date()
+      sampleFiles: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     }
   }
 
@@ -165,45 +166,45 @@ export class ModelSyncService {
         id: `${modelId}_hourly`,
         modelId,
         name: 'Hourly Access',
-        type: 'premium',
-        price: basePrice * 100, // $2/hour
-        unit: 'hour',
+        description: 'Hourly access to the model',
+        unit: 'hour' as PricingUnit,
+        pricePerUnit: basePrice * 100, // $2/hour
+        currency: 'USD',
         features: ['1 hour access', 'API Access', 'Standard Support'],
-        supportLevel: 'standard',
-        active: true
+        isPopular: false
       },
       {
         id: `${modelId}_daily`,
         modelId,
         name: 'Daily Access',
-        type: 'premium', 
-        price: basePrice * 400, // $8/day (discount)
-        unit: 'day',
+        description: 'Daily access to the model',
+        unit: 'day' as PricingUnit,
+        pricePerUnit: basePrice * 400, // $8/day (discount)
+        currency: 'USD',
         features: ['24 hour access', 'API Access', 'Priority Support'],
-        supportLevel: 'priority',
-        active: true
+        isPopular: false
       },
       {
         id: `${modelId}_weekly`,
         modelId,
         name: 'Weekly Access',
-        type: 'premium',
-        price: basePrice * 1500, // $30/week (bigger discount)
-        unit: 'week', 
+        description: 'Weekly access to the model',
+        unit: 'week' as PricingUnit,
+        pricePerUnit: basePrice * 1500, // $30/week (bigger discount)
+        currency: 'USD',
         features: ['7 day access', 'API Access', 'Priority Support', 'Usage Analytics'],
-        supportLevel: 'priority',
-        active: true
+        isPopular: true
       },
       {
         id: `${modelId}_monthly`,
         modelId,
         name: 'Monthly Access',
-        type: 'premium',
-        price: basePrice * 5000, // $100/month (best value)
-        unit: 'month',
+        description: 'Monthly access to the model',
+        unit: 'month' as PricingUnit,
+        pricePerUnit: basePrice * 5000, // $100/month (best value)
+        currency: 'USD',
         features: ['30 day access', 'API Access', 'Priority Support', 'Usage Analytics', 'Custom Limits'],
-        supportLevel: 'priority',
-        active: true
+        isPopular: false
       }
     ]
   }
@@ -211,27 +212,35 @@ export class ModelSyncService {
   // Helper methods
   private mapPipelineTagToCategory(tag: string): ModelCategory {
     const mapping: Record<string, ModelCategory> = {
-      'text-generation': 'nlp',
-      'text-classification': 'nlp',
-      'question-answering': 'nlp',
-      'summarization': 'nlp',
-      'translation': 'nlp',
-      'image-classification': 'computer-vision',
-      'object-detection': 'computer-vision',
-      'image-to-text': 'multimodal',
-      'automatic-speech-recognition': 'audio',
-      'text-to-speech': 'audio',
-      'reinforcement-learning': 'reinforcement-learning'
+      'text-generation': ModelCategory.NLP,
+      'text-classification': ModelCategory.NLP,
+      'question-answering': ModelCategory.NLP,
+      'summarization': ModelCategory.NLP,
+      'translation': ModelCategory.NLP,
+      'image-classification': ModelCategory.CV,
+      'object-detection': ModelCategory.CV,
+      'image-to-text': ModelCategory.MULTIMODAL,
+      'automatic-speech-recognition': ModelCategory.AUDIO,
+      'text-to-speech': ModelCategory.AUDIO,
+      'reinforcement-learning': ModelCategory.RL
     }
-    return mapping[tag] || 'other'
+    return mapping[tag] || ModelCategory.NLP
   }
 
-  private extractArchitecture(tags: string[]): string {
+  private extractArchitecture(tags: string[]): ModelArchitecture {
     const architectures = ['transformer', 'bert', 'gpt', 'llama', 'falcon', 'mistral']
     const found = tags.find(tag => 
       architectures.some(arch => tag.toLowerCase().includes(arch))
     )
-    return found || 'Transformer'
+    
+    if (found) {
+      if (found.toLowerCase().includes('bert')) return ModelArchitecture.BERT
+      if (found.toLowerCase().includes('gpt')) return ModelArchitecture.GPT
+      if (found.toLowerCase().includes('llama')) return ModelArchitecture.LLAMA
+      if (found.toLowerCase().includes('falcon')) return ModelArchitecture.FALCON
+    }
+    
+    return ModelArchitecture.TRANSFORMER
   }
 
   private extractModelSize(tags: string[]): string {
@@ -261,14 +270,14 @@ export class ModelSyncService {
     return mapping[pipelineTag] || ['text']
   }
 
-  private mapLicense(tags: string[]): License {
+  private mapLicense(tags: string[]): LicenseType {
     if (tags.some(tag => tag.includes('apache') || tag.includes('mit'))) {
-      return 'open-source'
+      return LicenseType.MIT
     }
     if (tags.some(tag => tag.includes('commercial'))) {
-      return 'commercial'
+      return LicenseType.COMMERCIAL
     }
-    return 'open-source'
+    return LicenseType.MIT
   }
 }
 
