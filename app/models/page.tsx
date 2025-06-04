@@ -225,7 +225,16 @@ export default function ModelsPage() {
 
         <div className="flex items-center justify-between pt-2 border-t">
           <span className="font-medium text-primary">
-            {model.pricing.find((p: any) => p.active)?.name || "Contact for Pricing"}
+            {(() => {
+              const activePlan = model.pricing.find((p: any) => p.active)
+              if (!activePlan) {
+                // Find the cheapest plan if no active plan
+                const cheapestPlan = model.pricing.reduce((min: any, plan: any) => 
+                  plan.price < min.price ? plan : min, model.pricing[0])
+                return cheapestPlan ? `$${cheapestPlan.price}/${cheapestPlan.unit}` : "Contact for Pricing"
+              }
+              return `$${activePlan.price}/${activePlan.unit}`
+            })()}
           </span>
         </div>
       </CardContent>
