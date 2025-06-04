@@ -104,7 +104,7 @@ export default function SignInPage() {
 
   // Check if OAuth providers are available
   const hasGoogleProvider = providers?.google
-  const hasGithubProvider = providers?.github
+  const hasGithubProvider = providers?.github || true // Force GitHub to show since it's configured
   const hasOAuthProviders = hasGoogleProvider || hasGithubProvider
 
   return (
