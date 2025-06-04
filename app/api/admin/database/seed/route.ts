@@ -207,7 +207,7 @@ export async function POST(request: NextRequest) {
           requestsPerMinute: 100,
           maxBatchSize: 10,
           features: ['API Access', 'Basic Support'],
-          supportLevel: 'BASIC',
+          supportLevel: 'COMMUNITY',
           active: true,
         },
         // Whisper pricing
@@ -257,7 +257,7 @@ export async function POST(request: NextRequest) {
       timestamp: new Date().toISOString()
     })
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Seed error:', error)
     return NextResponse.json(
       { error: 'Failed to seed database', details: error.message },
