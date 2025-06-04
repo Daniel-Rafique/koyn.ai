@@ -15,7 +15,6 @@
     "db:seed": "prisma db seed",
     "db:reset": "prisma migrate reset",
     "vercel-build": "prisma generate && prisma migrate deploy && next build",
-    "production-setup": "./scripts/deploy.sh",
     "check-env": "node -e \"console.log('Environment check:', {NODE_ENV: process.env.NODE_ENV, DATABASE_URL: !!process.env.DATABASE_URL, NEXTAUTH_SECRET: !!process.env.NEXTAUTH_SECRET})\""
   },
   "dependencies": {
