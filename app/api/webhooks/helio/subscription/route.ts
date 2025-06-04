@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { headers } from 'next/headers'
 import { helioService } from '@/lib/helio'
 import { HelioWebhookPayload } from '@/lib/types'
+import { helioPaymentHandler } from '@/lib/helio-payment-handler'
 
 export async function POST(request: NextRequest) {
   try {
@@ -51,28 +51,39 @@ export async function POST(request: NextRequest) {
     // Process the webhook through our service
     const payment = await helioService.processWebhook(payload)
 
-    // Handle subscription-specific events
+    // Handle subscription-specific events using comprehensive handlers
+    let result: { success: boolean; subscriptionId?: string; error?: string }
+
     switch (payload.event) {
       case 'STARTED':
-        await handleSubscriptionStarted(payment, payload)
+        result = await helioPaymentHandler.handleSubscriptionStarted(payment, payload)
         break
       case 'RENEWED':
-        await handleSubscriptionRenewed(payment, payload)
+        result = await helioPaymentHandler.handleSubscriptionRenewed(payment, payload)
         break
       case 'ENDED':
-        await handleSubscriptionEnded(payment, payload)
+        result = await helioPaymentHandler.handleSubscriptionEnded(payment, payload)
         break
       default:
         console.log(`Unhandled subscription event: ${payload.event}`)
+        result = { success: true }
+    }
+
+    if (!result.success) {
+      console.error(`Subscription ${payload.event} processing failed:`, result.error)
+      return NextResponse.json({
+        success: false,
+        error: result.error
+      }, { status: 500 })
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Subscription webhook processed successfully',
+      message: `Subscription ${payload.event.toLowerCase()} processed successfully`,
       data: {
         paymentId: payment.id,
         event: payload.event,
-        subscriptionEvent: payload.event
+        subscriptionId: result.subscriptionId
       }
     })
 
@@ -87,61 +98,6 @@ export async function POST(request: NextRequest) {
       },
       { status: 500 }
     )
-  }
-}
-
-async function handleSubscriptionStarted(payment: any, payload: HelioWebhookPayload) {
-  try {
-    console.log('🚀 Subscription started:', payment.id)
-    
-    // TODO: Implementation:
-    // 1. Create subscription record in database
-    // 2. Grant user access to the model
-    // 3. Send welcome email
-    // 4. Update creator earnings
-    // 5. Log analytics event
-    
-    console.log(`✅ Subscription started for model ${payment.modelId}`)
-    
-  } catch (error) {
-    console.error('Failed to handle subscription start:', error)
-    throw error
-  }
-}
-
-async function handleSubscriptionRenewed(payment: any, payload: HelioWebhookPayload) {
-  try {
-    console.log('🔄 Subscription renewed:', payment.id)
-    
-    // TODO: Implementation:
-    // 1. Update subscription end date
-    // 2. Reset usage counters
-    // 3. Process payment to creator
-    // 4. Send renewal confirmation
-    
-    console.log(`✅ Subscription renewed for model ${payment.modelId}`)
-    
-  } catch (error) {
-    console.error('Failed to handle subscription renewal:', error)
-    throw error
-  }
-}
-
-async function handleSubscriptionEnded(payment: any, payload: HelioWebhookPayload) {
-  try {
-    console.log('🛑 Subscription ended:', payment.id)
-    
-    // TODO: Implementation:
-    // 1. Update subscription status to ended
-    // 2. Revoke user access to the model
-    // 3. Send cancellation confirmation
-    // 4. Archive usage data
-    
-    console.log(`✅ Subscription ended for model ${payment.modelId}`)
-    
-  } catch (error) {
-    console.error('Failed to handle subscription end:', error)
-    throw error
   }
 }
 

@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { headers } from 'next/headers'
 import { helioService } from '@/lib/helio'
 import { HelioWebhookPayload } from '@/lib/types'
-import { subscriptionDb } from "@/lib/database"
-import { helioApiClient } from "@/lib/helio"
+import { helioPaymentHandler } from '@/lib/helio-payment-handler'
 
 export async function POST(request: NextRequest) {
   try {
@@ -53,19 +51,22 @@ export async function POST(request: NextRequest) {
     // Process the webhook through our service
     const payment = await helioService.processWebhook(webhookData)
 
-    // Handle specific payment events
-    switch (webhookData.event) {
-      case "CREATED":
-        await handlePaymentCompleted(payment)
-        break
-      default:
-        console.log(`Helio webhook event '${webhookData.event}' processed successfully`)
+    // Handle payment completion using the comprehensive handler
+    const result = await helioPaymentHandler.handlePaymentCompleted(payment, webhookData)
+
+    if (!result.success) {
+      console.error('Payment completion failed:', result.error)
+      return NextResponse.json({
+        success: false,
+        error: result.error
+      }, { status: 500 })
     }
 
     return NextResponse.json({ 
       success: true,
-      message: 'Webhook processed successfully',
-      paymentId: payment.id
+      message: 'Payment processed successfully',
+      paymentId: payment.id,
+      subscriptionId: result.subscriptionId
     })
 
   } catch (error) {
@@ -77,26 +78,6 @@ export async function POST(request: NextRequest) {
       },
       { status: 500 }
     )
-  }
-}
-
-async function handlePaymentCompleted(payment: any) {
-  try {
-    console.log('💰 Processing completed payment:', payment.id)
-    
-    // TODO: Implement payment completion logic:
-    // 1. Create/update subscription record in database
-    // 2. Grant user access to the model
-    // 3. Update creator earnings
-    // 4. Send confirmation email
-    // 5. Log analytics event
-    
-    // For now, just log the event
-    console.log(`✅ Payment ${payment.id} processed for model ${payment.modelId}`)
-    
-  } catch (error) {
-    console.error(`Failed to process payment completion for ${payment.id}:`, error)
-    throw error
   }
 }
 

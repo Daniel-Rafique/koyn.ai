@@ -29,6 +29,7 @@ class HelioAPIClient extends APIClient {
   async createPayLink(data: {
     modelId: string
     planId: string
+    userId?: string
     amount: number
     currency: string
     customerEmail?: string
@@ -36,6 +37,9 @@ class HelioAPIClient extends APIClient {
     cancelUrl?: string
     metadata?: Record<string, any>
   }) {
+    // Create a structured paylink ID for easier parsing in webhooks
+    const paylinkIdSuffix = `model_${data.modelId}_plan_${data.planId}_user_${data.userId || 'guest'}`
+    
     const payload = {
       amount: data.amount,
       currency: data.currency,
@@ -45,19 +49,25 @@ class HelioAPIClient extends APIClient {
       metadata: {
         modelId: data.modelId,
         planId: data.planId,
+        userId: data.userId,
+        timestamp: Date.now(),
+        version: '1.0',
         ...data.metadata
       }
     }
 
-    return this.post<{ id: string; url: string }>('/paylink', payload, {
+    const response = await this.post<{ id: string; url: string; paylinkId: string }>('/paylink', payload, {
       Authorization: `Bearer ${this.apiSecret}`
     })
+
+    return response
   }
 
   // Create a subscription pay link
   async createSubscriptionPayLink(data: {
     modelId: string
     planId: string
+    userId?: string
     amount: number
     currency: string
     interval: 'daily' | 'weekly' | 'monthly' | 'yearly'
@@ -65,6 +75,9 @@ class HelioAPIClient extends APIClient {
     trialDays?: number
     metadata?: Record<string, any>
   }) {
+    // Create a structured paylink ID for easier parsing in webhooks
+    const paylinkIdSuffix = `subscription_model_${data.modelId}_plan_${data.planId}_user_${data.userId || 'guest'}`
+    
     const payload = {
       amount: data.amount,
       currency: data.currency,
@@ -76,13 +89,20 @@ class HelioAPIClient extends APIClient {
       metadata: {
         modelId: data.modelId,
         planId: data.planId,
+        userId: data.userId,
+        subscriptionType: true,
+        interval: data.interval,
+        timestamp: Date.now(),
+        version: '1.0',
         ...data.metadata
       }
     }
 
-    return this.post<{ id: string; url: string }>('/paylink/subscription', payload, {
+    const response = await this.post<{ id: string; url: string; paylinkId: string }>('/paylink/subscription', payload, {
       Authorization: `Bearer ${this.apiSecret}`
     })
+
+    return response
   }
 
   // Create a webhook
@@ -146,6 +166,7 @@ export class HelioService {
   async createModelPayment(
     modelId: string,
     plan: PricingPlan,
+    userId?: string,
     userEmail?: string,
     metadata?: Record<string, any>
   ) {
@@ -157,6 +178,7 @@ export class HelioService {
       const payLinkResponse = await this.client.createPayLink({
         modelId,
         planId: plan.id,
+        userId,
         amount,
         currency,
         customerEmail: userEmail,
@@ -190,6 +212,7 @@ export class HelioService {
   async createModelSubscription(
     modelId: string,
     plan: PricingPlan,
+    userId?: string,
     userEmail?: string,
     metadata?: Record<string, any>
   ) {
@@ -201,6 +224,7 @@ export class HelioService {
       const subscriptionResponse = await this.client.createSubscriptionPayLink({
         modelId,
         planId: plan.id,
+        userId,
         amount,
         currency,
         interval,

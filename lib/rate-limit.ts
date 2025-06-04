@@ -94,6 +94,13 @@ export const rateLimiters = {
     message: 'Too many requests, please try again later'
   }),
   
+  // Dashboard endpoints (higher limit for frequent polls)
+  dashboard: createRateLimit({
+    windowMs: 60 * 1000, // 1 minute
+    maxRequests: 30,
+    message: 'Dashboard request limit exceeded'
+  }),
+  
   // Authentication endpoints (stricter)
   auth: createRateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes

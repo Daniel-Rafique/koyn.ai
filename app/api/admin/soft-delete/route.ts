@@ -19,7 +19,14 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get('type') || 'all'
     const limit = parseInt(searchParams.get('limit') || '50')
 
-    const result: any = {
+    const result: {
+      timestamp: string;
+      deletedItems: {
+        users?: unknown[];
+        models?: unknown[];
+        subscriptions?: unknown[];
+      }
+    } = {
       timestamp: new Date().toISOString(),
       deletedItems: {}
     }

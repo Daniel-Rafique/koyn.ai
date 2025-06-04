@@ -24,7 +24,7 @@ async function registerHandler(request: NextRequest) {
       )
     }
 
-    const { email, username, displayName, password, role, subscribeNewsletter } = validation.data
+    const { email, username, displayName, password, role } = validation.data
 
     // Security checks
     if (securityValidation.hasSQLInjection(email) || 
@@ -74,7 +74,7 @@ async function registerHandler(request: NextRequest) {
         email,
         name: username,
         password: hashedPassword,
-        type: role as any,
+        type: role as "CONSUMER" | "CREATOR" | "ENTERPRISE",
         createdAt: new Date(),
         updatedAt: new Date(),
       },

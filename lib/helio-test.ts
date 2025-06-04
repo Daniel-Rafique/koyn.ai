@@ -59,6 +59,7 @@ export class HelioTestService {
       const paymentLink = await helioService.createModelPayment(
         'test_model_001',
         testPlan,
+        'test_user_123',
         'test@example.com',
         {
           testMode: true,
@@ -102,6 +103,7 @@ export class HelioTestService {
       const subscriptionLink = await helioService.createModelSubscription(
         'test_model_001',
         testPlan,
+        'test_user_123',
         'test@example.com',
         {
           testMode: true,
