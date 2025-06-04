@@ -156,7 +156,11 @@ export async function GET(request: NextRequest) {
             displayName: true,
             verified: true,
             rating: true,
-            avatar: true
+            user: {
+              select: {
+                avatar: true
+              }
+            }
           }
         },
         pricing: {
@@ -178,7 +182,7 @@ export async function GET(request: NextRequest) {
           select: {
             reviews: true,
             subscriptions: true,
-            usageRecords: true
+            usageStats: true
           }
         }
       },

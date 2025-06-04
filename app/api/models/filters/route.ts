@@ -54,7 +54,7 @@ async function getFiltersHandler(request: NextRequest) {
       // Task distribution (flatten array fields)
       prisma.$queryRaw<Array<{ task: string; count: number }>>`
         SELECT unnest(tasks) as task, COUNT(*) as count
-        FROM "Model" 
+        FROM "models" 
         WHERE status = 'PUBLISHED' 
         GROUP BY task 
         ORDER BY count DESC
@@ -64,12 +64,12 @@ async function getFiltersHandler(request: NextRequest) {
       // Input/Output modality distribution
       prisma.$queryRaw<Array<{ modality: string; type: string; count: number }>>`
         SELECT unnest("inputModalities") as modality, 'input' as type, COUNT(*) as count
-        FROM "Model" 
+        FROM "models" 
         WHERE status = 'PUBLISHED' 
         GROUP BY modality
         UNION
         SELECT unnest("outputModalities") as modality, 'output' as type, COUNT(*) as count
-        FROM "Model" 
+        FROM "models" 
         WHERE status = 'PUBLISHED' 
         GROUP BY modality
         ORDER BY count DESC
@@ -92,7 +92,7 @@ async function getFiltersHandler(request: NextRequest) {
     // Get popular tags
     const popularTags = await prisma.$queryRaw<Array<{ tag: string; count: number }>>`
       SELECT unnest(tags) as tag, COUNT(*) as count
-      FROM "Model" 
+      FROM "models" 
       WHERE status = 'PUBLISHED' 
       GROUP BY tag 
       ORDER BY count DESC, tag ASC
@@ -117,7 +117,7 @@ async function getFiltersHandler(request: NextRequest) {
           ELSE 'unknown'
         END as size_category,
         COUNT(*) as count
-      FROM "Model" 
+      FROM "models" 
       WHERE status = 'PUBLISHED'
       GROUP BY size_category
       ORDER BY count DESC
@@ -128,19 +128,19 @@ async function getFiltersHandler(request: NextRequest) {
       SELECT 
         CASE 
           WHEN EXISTS (
-            SELECT 1 FROM "PricingPlan" p 
+            SELECT 1 FROM "pricing_plans" p 
             WHERE p."modelId" = m.id 
             AND p.active = true 
             AND (p.type = 'FREE' OR p.price = 0)
           ) AND EXISTS (
-            SELECT 1 FROM "PricingPlan" p 
+            SELECT 1 FROM "pricing_plans" p 
             WHERE p."modelId" = m.id 
             AND p.active = true 
             AND p.type = 'PREMIUM' 
             AND p.price > 0
           ) THEN 'freemium'
           WHEN EXISTS (
-            SELECT 1 FROM "PricingPlan" p 
+            SELECT 1 FROM "pricing_plans" p 
             WHERE p."modelId" = m.id 
             AND p.active = true 
             AND (p.type = 'FREE' OR p.price = 0)
@@ -148,7 +148,7 @@ async function getFiltersHandler(request: NextRequest) {
           ELSE 'paid'
         END as pricing_type,
         COUNT(*) as count
-      FROM "Model" m
+      FROM "models" m
       WHERE m.status = 'PUBLISHED'
       GROUP BY pricing_type
       ORDER BY count DESC

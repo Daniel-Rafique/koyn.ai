@@ -115,11 +115,15 @@ async function searchHandler(request: NextRequest) {
 
     // Search and suggest tags
     if (type === 'all' || type === 'tags') {
+      // Use a simpler approach to avoid SQL issues
       const tagResults = await prisma.$queryRaw<Array<{ tag: string; count: number }>>`
-        SELECT unnest(tags) as tag, COUNT(*) as count
-        FROM "Model" 
-        WHERE status = 'PUBLISHED' 
-        AND unnest(tags) ILIKE ${`%${searchTerm}%`}
+        SELECT tag, count(*) as count
+        FROM (
+          SELECT unnest(tags) as tag
+          FROM "models" 
+          WHERE status = 'PUBLISHED'
+        ) AS tag_list
+        WHERE tag ILIKE ${`%${searchTerm}%`}
         GROUP BY tag 
         ORDER BY count DESC, tag ASC
         LIMIT ${limit}
