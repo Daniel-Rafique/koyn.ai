@@ -85,14 +85,21 @@ export default function ModelsPage() {
   })
   const [models, setModels] = useState<DatabaseModel[]>([])
   const [totalModels, setTotalModels] = useState(0)
+  const [offset, setOffset] = useState(0)
+  const [hasMore, setHasMore] = useState(false)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
 
   // Debounced search query
   const debouncedSearchQuery = useDebounce(searchTerm, 300)
 
   // Fetch models from API
   useEffect(() => {
-    const fetchModels = async () => {
-      setIsLoading(true)
+    const fetchModels = async (reset = true) => {
+      if (reset) {
+        setIsLoading(true)
+        setOffset(0)
+      }
+      
       try {
         const params = new URLSearchParams()
         if (debouncedSearchQuery) params.set('search', debouncedSearchQuery)
@@ -100,11 +107,24 @@ export default function ModelsPage() {
         if (selectedSort) params.set('sort', selectedSort)
         if (selectedPricing !== 'all') params.set('pricing', selectedPricing)
         
+        // Only set offset for load more, not initial load
+        const currentOffset = reset ? 0 : offset
+        params.set('limit', '8')
+        params.set('offset', currentOffset.toString())
+        
         const response = await fetch(`/api/models?${params.toString()}`)
         if (response.ok) {
           const data = await response.json()
-          setModels(data.data.models || [])
+          const newModels = data.data.models || []
+          
+          if (reset) {
+            setModels(newModels)
+          } else {
+            setModels(prev => [...prev, ...newModels])
+          }
+          
           setTotalModels(data.data.pagination.total || 0)
+          setHasMore(data.data.pagination.hasMore || false)
         } else {
           console.error('Failed to fetch models')
         }
@@ -112,10 +132,11 @@ export default function ModelsPage() {
         console.error('Error fetching models:', error)
       } finally {
         setIsLoading(false)
+        setIsLoadingMore(false)
       }
     }
 
-    fetchModels()
+    fetchModels(true)
   }, [debouncedSearchQuery, selectedCategory, selectedSort, selectedPricing])
 
   // Active filters for display
@@ -240,6 +261,38 @@ export default function ModelsPage() {
       </CardContent>
     </Card>
   )
+
+  // Load more function
+  const loadMoreModels = async () => {
+    if (isLoadingMore || !hasMore) return
+    
+    setIsLoadingMore(true)
+    const newOffset = offset + 8
+    setOffset(newOffset)
+    
+    try {
+      const params = new URLSearchParams()
+      if (debouncedSearchQuery) params.set('search', debouncedSearchQuery)
+      if (selectedCategory !== 'all') params.set('category', selectedCategory)
+      if (selectedSort) params.set('sort', selectedSort)
+      if (selectedPricing !== 'all') params.set('pricing', selectedPricing)
+      params.set('limit', '8')
+      params.set('offset', newOffset.toString())
+      
+      const response = await fetch(`/api/models?${params.toString()}`)
+      if (response.ok) {
+        const data = await response.json()
+        const newModels = data.data.models || []
+        
+        setModels(prev => [...prev, ...newModels])
+        setHasMore(data.data.pagination.hasMore || false)
+      }
+    } catch (error) {
+      console.error('Error loading more models:', error)
+    } finally {
+      setIsLoadingMore(false)
+    }
+  }
 
   if (isLoading) {
     return (
@@ -394,10 +447,15 @@ export default function ModelsPage() {
         </div>
 
         {/* Load More Button */}
-        {models.length > 0 && (
+        {models.length > 0 && hasMore && (
           <div className="text-center mt-12">
-            <Button variant="outline" size="lg" disabled={isLoading}>
-              {isLoading ? "Loading..." : "Load More Models"}
+            <Button 
+              variant="outline" 
+              size="lg" 
+              disabled={isLoadingMore}
+              onClick={loadMoreModels}
+            >
+              {isLoadingMore ? "Loading..." : "Load More Models"}
             </Button>
           </div>
         )}
