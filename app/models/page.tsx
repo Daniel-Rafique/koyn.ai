@@ -103,8 +103,8 @@ export default function ModelsPage() {
         const response = await fetch(`/api/models?${params.toString()}`)
         if (response.ok) {
           const data = await response.json()
-          setModels(data.models || [])
-          setTotalModels(data.total || 0)
+          setModels(data.data.models || [])
+          setTotalModels(data.data.pagination.total || 0)
         } else {
           console.error('Failed to fetch models')
         }
