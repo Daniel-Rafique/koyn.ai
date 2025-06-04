@@ -14,7 +14,7 @@
     "db:studio": "prisma studio",
     "db:seed": "prisma db seed",
     "db:reset": "prisma migrate reset",
-    "vercel-build": "prisma generate && prisma db push && next build",
+    "vercel-build": "prisma generate && prisma db push --force-reset && next build",
     "check-env": "node -e \"console.log('Environment check:', {NODE_ENV: process.env.NODE_ENV, DATABASE_URL: !!process.env.DATABASE_URL, NEXTAUTH_SECRET: !!process.env.NEXTAUTH_SECRET})\""
   },
   "dependencies": {
