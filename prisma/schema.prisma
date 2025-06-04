@@ -29,6 +29,7 @@ model User {
   discussions   Discussion[]
   accounts      Account[]
   sessions      Session[]
+  files         File[]
 
   @@map("users")
 }
@@ -107,6 +108,7 @@ model Model {
   benchmarks    Benchmark[]
   versions      ModelVersion[]
   files         ModelFile[]
+  uploadedFiles File[]
   subscriptions Subscription[]
   usageStats    UsageStats[]
   reviews       Review[]
@@ -248,6 +250,31 @@ model ModelFile {
   model Model @relation(fields: [modelId], references: [id], onDelete: Cascade)
 
   @@map("model_files")
+}
+
+model File {
+  id           String   @id @default(cuid())
+  name         String
+  originalName String
+  mimeType     String
+  size         Int
+  path         String
+  url          String
+  hash         String
+  type         String   // 'models', 'images', 'documents'
+  uploadedBy   String
+  modelId      String?
+  description  String?
+  isPublic     Boolean  @default(false)
+  metadata     Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  user  User   @relation(fields: [uploadedBy], references: [id], onDelete: Cascade)
+  model Model? @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  @@map("files")
 }
 
 model Review {

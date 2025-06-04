@@ -1,420 +1,576 @@
 "use client"
 
-import { useState } from "react"
-import { MapPin, Calendar, Edit, Save, X, Key, CreditCard } from "lucide-react"
+import { useState, useEffect } from "react"
+import { useSession } from "next-auth/react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Switch } from "@/components/ui/switch"
+import { Badge } from "@/components/ui/badge"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
+import { 
+  User, 
+  Settings, 
+  Key, 
+  BarChart3, 
+  CreditCard, 
+  Shield, 
+  Edit, 
+  Copy,
+  Eye,
+  EyeOff,
+  Plus,
+  Trash2
+} from "lucide-react"
+import { toast } from "sonner"
+
+interface UserProfile {
+  id: string
+  name: string
+  email: string
+  avatar?: string
+  type: string
+  createdAt: string
+  creatorProfile?: {
+    displayName: string
+    bio?: string
+    website?: string
+    github?: string
+    twitter?: string
+    verified: boolean
+    rating: number
+    totalEarnings: number
+  }
+}
+
+interface APIKey {
+  id: string
+  name: string
+  keyHash: string
+  lastUsed?: string
+  rateLimit: number
+  isActive: boolean
+  createdAt: string
+}
+
+interface Subscription {
+  id: string
+  status: string
+  currentPeriodStart: string
+  currentPeriodEnd: string
+  model: {
+    name: string
+    slug: string
+  }
+  plan: {
+    name: string
+    price: number
+    unit: string
+  }
+}
 
 export default function ProfilePage() {
+  const { data: session, status } = useSession()
+  const [loading, setLoading] = useState(true)
+  const [profile, setProfile] = useState<UserProfile | null>(null)
+  const [apiKeys, setApiKeys] = useState<APIKey[]>([])
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([])
   const [isEditing, setIsEditing] = useState(false)
-  const [profile, setProfile] = useState({
-    name: "John Doe",
-    email: "john.doe@example.com",
-    bio: "AI enthusiast and developer building the next generation of intelligent applications.",
-    location: "San Francisco, CA",
-    website: "https://johndoe.dev",
-    company: "TechCorp Inc.",
-    joinedDate: "January 2023",
+  const [showApiKeys, setShowApiKeys] = useState<{[key: string]: boolean}>({})
+
+  // Form states
+  const [formData, setFormData] = useState({
+    name: '',
+    bio: '',
+    website: '',
+    github: '',
+    twitter: ''
   })
 
-  const [notifications, setNotifications] = useState({
-    emailUpdates: true,
-    modelUpdates: false,
-    securityAlerts: true,
-    marketingEmails: false,
-  })
+  useEffect(() => {
+    if (status === 'authenticated') {
+      fetchProfile()
+      fetchApiKeys()
+      fetchSubscriptions()
+    }
+  }, [status])
 
-  const apiKeys = [
-    {
-      id: "1",
-      name: "Production API Key",
-      key: "sk-proj-abc123...xyz789",
-      created: "2024-01-15",
-      lastUsed: "2024-01-20",
-      usage: "1.2M calls",
-    },
-    {
-      id: "2",
-      name: "Development API Key",
-      key: "sk-dev-def456...uvw012",
-      created: "2024-01-10",
-      lastUsed: "2024-01-19",
-      usage: "45K calls",
-    },
-  ]
-
-  const usageStats = {
-    currentPlan: "Pro",
-    apiCalls: {
-      used: 75000,
-      limit: 100000,
-    },
-    billing: {
-      currentPeriod: "Jan 1 - Jan 31, 2024",
-      amount: "$29.00",
-      nextBilling: "Feb 1, 2024",
-    },
+  const fetchProfile = async () => {
+    try {
+      const response = await fetch('/api/user/profile')
+      if (response.ok) {
+        const data = await response.json()
+        setProfile(data.data.user)
+        setFormData({
+          name: data.data.user.name || '',
+          bio: data.data.user.creatorProfile?.bio || '',
+          website: data.data.user.creatorProfile?.website || '',
+          github: data.data.user.creatorProfile?.github || '',
+          twitter: data.data.user.creatorProfile?.twitter || ''
+        })
+      }
+    } catch (error) {
+      console.error('Error fetching profile:', error)
+      toast.error('Failed to load profile')
+    }
   }
 
-  const handleSave = () => {
-    setIsEditing(false)
-    // Save profile logic here
+  const fetchApiKeys = async () => {
+    try {
+      const response = await fetch('/api/user/api-keys')
+      if (response.ok) {
+        const data = await response.json()
+        setApiKeys(data.data.apiKeys || [])
+      }
+    } catch (error) {
+      console.error('Error fetching API keys:', error)
+    }
   }
 
-  const handleCancel = () => {
-    setIsEditing(false)
-    // Reset form logic here
+  const fetchSubscriptions = async () => {
+    try {
+      const response = await fetch('/api/user/subscriptions')
+      if (response.ok) {
+        const data = await response.json()
+        setSubscriptions(data.data.subscriptions || [])
+      }
+    } catch (error) {
+      console.error('Error fetching subscriptions:', error)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  return (
-    <div className="min-h-screen bg-background">
-      <div className="container py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Profile Sidebar */}
-          <div className="space-y-6">
-            <Card>
-              <CardHeader className="text-center">
-                <Avatar className="h-24 w-24 mx-auto mb-4">
-                  <AvatarImage src="/placeholder.svg?height=96&width=96" alt={profile.name} />
-                  <AvatarFallback>
-                    {profile.name
-                      .split(" ")
-                      .map((n) => n[0])
-                      .join("")}
-                  </AvatarFallback>
-                </Avatar>
-                <CardTitle className="text-xl">{profile.name}</CardTitle>
-                <p className="text-muted-foreground">{profile.email}</p>
-                <Badge variant="secondary">{usageStats.currentPlan} Plan</Badge>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center space-x-2 text-sm">
-                  <MapPin className="h-4 w-4 text-muted-foreground" />
-                  <span>{profile.location}</span>
-                </div>
-                <div className="flex items-center space-x-2 text-sm">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span>Joined {profile.joinedDate}</span>
-                </div>
-                <Button variant="outline" className="w-full">
-                  <Edit className="mr-2 h-4 w-4" />
-                  Edit Profile Picture
-                </Button>
-              </CardContent>
-            </Card>
+  const handleSave = async () => {
+    try {
+      const response = await fetch('/api/user/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      })
 
-            {/* Usage Overview */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Usage This Month</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <div className="flex justify-between text-sm mb-2">
-                    <span>API Calls</span>
-                    <span>
-                      {usageStats.apiCalls.used.toLocaleString()} / {usageStats.apiCalls.limit.toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="w-full bg-muted rounded-full h-2">
-                    <div
-                      className="bg-primary h-2 rounded-full"
-                      style={{ width: `${(usageStats.apiCalls.used / usageStats.apiCalls.limit) * 100}%` }}
-                    />
-                  </div>
-                </div>
-                <Separator />
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span>Current Period</span>
-                    <span>{usageStats.billing.currentPeriod}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Amount</span>
-                    <span className="font-medium">{usageStats.billing.amount}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Next Billing</span>
-                    <span>{usageStats.billing.nextBilling}</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+      if (response.ok) {
+        toast.success('Profile updated successfully')
+        setIsEditing(false)
+        fetchProfile()
+      } else {
+        toast.error('Failed to update profile')
+      }
+    } catch (error) {
+      console.error('Error updating profile:', error)
+      toast.error('Failed to update profile')
+    }
+  }
 
-          {/* Main Content */}
-          <div className="lg:col-span-2">
-            <Tabs defaultValue="profile" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="profile">Profile</TabsTrigger>
-                <TabsTrigger value="api-keys">API Keys</TabsTrigger>
-                <TabsTrigger value="billing">Billing</TabsTrigger>
-                <TabsTrigger value="settings">Settings</TabsTrigger>
-              </TabsList>
+  const createApiKey = async () => {
+    const name = prompt('Enter a name for your API key:')
+    if (!name) return
 
-              {/* Profile Tab */}
-              <TabsContent value="profile">
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between">
-                    <CardTitle>Profile Information</CardTitle>
-                    {!isEditing ? (
-                      <Button variant="outline" onClick={() => setIsEditing(true)}>
-                        <Edit className="mr-2 h-4 w-4" />
-                        Edit
-                      </Button>
-                    ) : (
-                      <div className="flex space-x-2">
-                        <Button size="sm" onClick={handleSave}>
-                          <Save className="mr-2 h-4 w-4" />
-                          Save
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={handleCancel}>
-                          <X className="mr-2 h-4 w-4" />
-                          Cancel
-                        </Button>
-                      </div>
-                    )}
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <Label htmlFor="name">Full Name</Label>
-                        <Input
-                          id="name"
-                          value={profile.name}
-                          onChange={(e) => setProfile({ ...profile, name: e.target.value })}
-                          disabled={!isEditing}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="email">Email</Label>
-                        <Input
-                          id="email"
-                          type="email"
-                          value={profile.email}
-                          onChange={(e) => setProfile({ ...profile, email: e.target.value })}
-                          disabled={!isEditing}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="company">Company</Label>
-                        <Input
-                          id="company"
-                          value={profile.company}
-                          onChange={(e) => setProfile({ ...profile, company: e.target.value })}
-                          disabled={!isEditing}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="location">Location</Label>
-                        <Input
-                          id="location"
-                          value={profile.location}
-                          onChange={(e) => setProfile({ ...profile, location: e.target.value })}
-                          disabled={!isEditing}
-                        />
-                      </div>
-                      <div className="space-y-2 md:col-span-2">
-                        <Label htmlFor="website">Website</Label>
-                        <Input
-                          id="website"
-                          value={profile.website}
-                          onChange={(e) => setProfile({ ...profile, website: e.target.value })}
-                          disabled={!isEditing}
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="bio">Bio</Label>
-                      <Textarea
-                        id="bio"
-                        value={profile.bio}
-                        onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
-                        disabled={!isEditing}
-                        rows={4}
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
+    try {
+      const response = await fetch('/api/user/api-keys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      })
 
-              {/* API Keys Tab */}
-              <TabsContent value="api-keys">
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between">
-                    <CardTitle>API Keys</CardTitle>
-                    <Button>
-                      <Key className="mr-2 h-4 w-4" />
-                      Create New Key
-                    </Button>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {apiKeys.map((key) => (
-                        <Card key={key.id}>
-                          <CardContent className="pt-6">
-                            <div className="flex items-center justify-between">
-                              <div className="space-y-2">
-                                <h4 className="font-medium">{key.name}</h4>
-                                <code className="text-sm bg-muted px-2 py-1 rounded">{key.key}</code>
-                                <div className="flex space-x-4 text-sm text-muted-foreground">
-                                  <span>Created: {key.created}</span>
-                                  <span>Last used: {key.lastUsed}</span>
-                                  <span>Usage: {key.usage}</span>
-                                </div>
-                              </div>
-                              <div className="flex space-x-2">
-                                <Button variant="outline" size="sm">
-                                  Copy
-                                </Button>
-                                <Button variant="destructive" size="sm">
-                                  Delete
-                                </Button>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
+      if (response.ok) {
+        const data = await response.json()
+        toast.success(`API key created: ${data.data.key}`)
+        fetchApiKeys()
+      } else {
+        toast.error('Failed to create API key')
+      }
+    } catch (error) {
+      console.error('Error creating API key:', error)
+      toast.error('Failed to create API key')
+    }
+  }
 
-              {/* Billing Tab */}
-              <TabsContent value="billing">
-                <div className="space-y-6">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Current Plan</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="text-lg font-medium">{usageStats.currentPlan} Plan</h3>
-                          <p className="text-muted-foreground">100,000 API calls per month</p>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-2xl font-bold">$29/month</div>
-                          <Button variant="outline" size="sm">
-                            Change Plan
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+  const deleteApiKey = async (keyId: string) => {
+    if (!confirm('Are you sure you want to delete this API key?')) return
 
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Payment Method</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-4">
-                          <CreditCard className="h-8 w-8 text-muted-foreground" />
-                          <div>
-                            <p className="font-medium">•••• •••• •••• 4242</p>
-                            <p className="text-sm text-muted-foreground">Expires 12/25</p>
-                          </div>
-                        </div>
-                        <Button variant="outline" size="sm">
-                          Update
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
+    try {
+      const response = await fetch(`/api/user/api-keys/${keyId}`, {
+        method: 'DELETE'
+      })
 
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Billing History</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        {[
-                          { date: "Jan 1, 2024", amount: "$29.00", status: "Paid" },
-                          { date: "Dec 1, 2023", amount: "$29.00", status: "Paid" },
-                          { date: "Nov 1, 2023", amount: "$29.00", status: "Paid" },
-                        ].map((invoice, index) => (
-                          <div key={index} className="flex items-center justify-between py-2">
-                            <div>
-                              <p className="font-medium">{invoice.date}</p>
-                              <p className="text-sm text-muted-foreground">Pro Plan</p>
-                            </div>
-                            <div className="text-right">
-                              <p className="font-medium">{invoice.amount}</p>
-                              <Badge variant="outline">{invoice.status}</Badge>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              </TabsContent>
+      if (response.ok) {
+        toast.success('API key deleted')
+        fetchApiKeys()
+      } else {
+        toast.error('Failed to delete API key')
+      }
+    } catch (error) {
+      console.error('Error deleting API key:', error)
+      toast.error('Failed to delete API key')
+    }
+  }
 
-              {/* Settings Tab */}
-              <TabsContent value="settings">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Notification Settings</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label>Email Updates</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Receive updates about new features and improvements
-                        </p>
-                      </div>
-                      <Switch
-                        checked={notifications.emailUpdates}
-                        onCheckedChange={(checked) => setNotifications({ ...notifications, emailUpdates: checked })}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label>Model Updates</Label>
-                        <p className="text-sm text-muted-foreground">Get notified when new models are available</p>
-                      </div>
-                      <Switch
-                        checked={notifications.modelUpdates}
-                        onCheckedChange={(checked) => setNotifications({ ...notifications, modelUpdates: checked })}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label>Security Alerts</Label>
-                        <p className="text-sm text-muted-foreground">Important security notifications and alerts</p>
-                      </div>
-                      <Switch
-                        checked={notifications.securityAlerts}
-                        onCheckedChange={(checked) => setNotifications({ ...notifications, securityAlerts: checked })}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label>Marketing Emails</Label>
-                        <p className="text-sm text-muted-foreground">Promotional content and special offers</p>
-                      </div>
-                      <Switch
-                        checked={notifications.marketingEmails}
-                        onCheckedChange={(checked) => setNotifications({ ...notifications, marketingEmails: checked })}
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text)
+    toast.success('Copied to clipboard')
+  }
+
+  if (status === 'loading' || loading) {
+    return (
+      <div className="container mx-auto py-8">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-2 text-muted-foreground">Loading profile...</p>
           </div>
         </div>
       </div>
+    )
+  }
+
+  if (status === 'unauthenticated') {
+    return (
+      <div className="container mx-auto py-8">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Authentication Required</h1>
+          <p className="text-muted-foreground">Please sign in to view your profile.</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="container mx-auto py-8 space-y-8">
+      {/* Header */}
+      <div className="flex items-center space-x-4">
+        <Avatar className="h-20 w-20">
+          <AvatarImage src={profile?.avatar} alt={profile?.name} />
+          <AvatarFallback className="text-lg">
+            {profile?.name?.charAt(0).toUpperCase()}
+          </AvatarFallback>
+        </Avatar>
+        <div className="space-y-1">
+          <h1 className="text-3xl font-bold">{profile?.name}</h1>
+          <p className="text-muted-foreground">{profile?.email}</p>
+          <div className="flex items-center space-x-2">
+            <Badge variant={profile?.type === 'CREATOR' ? 'default' : 'secondary'}>
+              {profile?.type}
+            </Badge>
+            {profile?.creatorProfile?.verified && (
+              <Badge variant="destructive">
+                <Shield className="w-3 h-3 mr-1" />
+                Verified
+              </Badge>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <Tabs defaultValue="profile" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="profile">
+            <User className="w-4 h-4 mr-2" />
+            Profile
+          </TabsTrigger>
+          <TabsTrigger value="api-keys">
+            <Key className="w-4 h-4 mr-2" />
+            API Keys
+          </TabsTrigger>
+          <TabsTrigger value="subscriptions">
+            <CreditCard className="w-4 h-4 mr-2" />
+            Subscriptions
+          </TabsTrigger>
+          <TabsTrigger value="analytics">
+            <BarChart3 className="w-4 h-4 mr-2" />
+            Analytics
+          </TabsTrigger>
+          <TabsTrigger value="settings">
+            <Settings className="w-4 h-4 mr-2" />
+            Settings
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Profile Tab */}
+        <TabsContent value="profile">
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <div>
+                  <CardTitle>Profile Information</CardTitle>
+                  <CardDescription>
+                    Update your personal information and profile details
+                  </CardDescription>
+                </div>
+                <Button
+                  variant={isEditing ? "default" : "outline"}
+                  onClick={() => setIsEditing(!isEditing)}
+                >
+                  <Edit className="w-4 h-4 mr-2" />
+                  {isEditing ? 'Cancel' : 'Edit'}
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Display Name</Label>
+                  <Input
+                    id="name"
+                    value={formData.name}
+                    onChange={(e) => setFormData({...formData, name: e.target.value})}
+                    disabled={!isEditing}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    value={profile?.email || ''}
+                    disabled
+                    className="bg-muted"
+                  />
+                </div>
+              </div>
+
+              {profile?.type === 'CREATOR' && (
+                <>
+                  <Separator />
+                  <h3 className="text-lg font-medium">Creator Information</h3>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="bio">Bio</Label>
+                    <Textarea
+                      id="bio"
+                      value={formData.bio}
+                      onChange={(e) => setFormData({...formData, bio: e.target.value})}
+                      disabled={!isEditing}
+                      placeholder="Tell us about yourself..."
+                      rows={3}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="website">Website</Label>
+                      <Input
+                        id="website"
+                        value={formData.website}
+                        onChange={(e) => setFormData({...formData, website: e.target.value})}
+                        disabled={!isEditing}
+                        placeholder="https://yoursite.com"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="github">GitHub</Label>
+                      <Input
+                        id="github"
+                        value={formData.github}
+                        onChange={(e) => setFormData({...formData, github: e.target.value})}
+                        disabled={!isEditing}
+                        placeholder="username"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="twitter">Twitter</Label>
+                      <Input
+                        id="twitter"
+                        value={formData.twitter}
+                        onChange={(e) => setFormData({...formData, twitter: e.target.value})}
+                        disabled={!isEditing}
+                        placeholder="@username"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg">Creator Stats</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Rating:</span>
+                          <span className="font-medium">{profile.creatorProfile?.rating || 0}/5</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Total Earnings:</span>
+                          <span className="font-medium">${profile.creatorProfile?.totalEarnings || 0}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Verified:</span>
+                          <Badge variant={profile.creatorProfile?.verified ? "destructive" : "secondary"}>
+                            {profile.creatorProfile?.verified ? "Yes" : "No"}
+                          </Badge>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </>
+              )}
+
+              {isEditing && (
+                <div className="flex justify-end space-x-2 pt-4">
+                  <Button variant="outline" onClick={() => setIsEditing(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleSave}>Save Changes</Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* API Keys Tab */}
+        <TabsContent value="api-keys">
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <div>
+                  <CardTitle>API Keys</CardTitle>
+                  <CardDescription>
+                    Manage your API keys for programmatic access
+                  </CardDescription>
+                </div>
+                <Button onClick={createApiKey}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create API Key
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {apiKeys.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No API keys found. Create one to get started.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {apiKeys.map((key) => (
+                    <div key={key.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div className="space-y-1">
+                        <div className="font-medium">{key.name}</div>
+                        <div className="text-sm text-muted-foreground">
+                          Created: {new Date(key.createdAt).toLocaleDateString()}
+                          {key.lastUsed && ` • Last used: ${new Date(key.lastUsed).toLocaleDateString()}`}
+                        </div>
+                        <div className="flex items-center space-x-2 text-sm">
+                          <span className="text-muted-foreground">Key:</span>
+                          <code className="bg-muted px-2 py-1 rounded text-xs">
+                            {showApiKeys[key.id] ? key.keyHash : '••••••••••••••••'}
+                          </code>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowApiKeys({
+                              ...showApiKeys,
+                              [key.id]: !showApiKeys[key.id]
+                            })}
+                          >
+                            {showApiKeys[key.id] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </Button>
+                          {showApiKeys[key.id] && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => copyToClipboard(key.keyHash)}
+                            >
+                              <Copy className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Badge variant={key.isActive ? "default" : "secondary"}>
+                          {key.isActive ? 'Active' : 'Inactive'}
+                        </Badge>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => deleteApiKey(key.id)}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Subscriptions Tab */}
+        <TabsContent value="subscriptions">
+          <Card>
+            <CardHeader>
+              <CardTitle>Active Subscriptions</CardTitle>
+              <CardDescription>
+                Manage your model subscriptions and access
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {subscriptions.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No active subscriptions found.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {subscriptions.map((sub) => (
+                    <div key={sub.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div className="space-y-1">
+                        <div className="font-medium">{sub.model.name}</div>
+                        <div className="text-sm text-muted-foreground">
+                          Plan: {sub.plan.name} • ${sub.plan.price}/{sub.plan.unit}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          Renews: {new Date(sub.currentPeriodEnd).toLocaleDateString()}
+                        </div>
+                      </div>
+                      <Badge variant={sub.status === 'ACTIVE' ? "default" : "secondary"}>
+                        {sub.status}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Analytics Tab */}
+        <TabsContent value="analytics">
+          <Card>
+            <CardHeader>
+              <CardTitle>Usage Analytics</CardTitle>
+              <CardDescription>
+                View your API usage and model statistics
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8 text-muted-foreground">
+                Analytics dashboard coming soon...
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Settings Tab */}
+        <TabsContent value="settings">
+          <Card>
+            <CardHeader>
+              <CardTitle>Account Settings</CardTitle>
+              <CardDescription>
+                Manage your account preferences and security
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8 text-muted-foreground">
+                Settings panel coming soon...
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

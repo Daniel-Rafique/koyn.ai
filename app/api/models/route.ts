@@ -4,10 +4,12 @@ import { prisma } from '@/lib/database'
 import { validateRequest, modelSchemas, sanitizers, securityValidation } from '@/lib/validation'
 import { withRateLimit, rateLimiters } from '@/lib/rate-limit'
 
-// GET - Fetch models with search and filtering
+// GET - Fetch models with enhanced search and filtering
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
+    
+    // Basic parameters
     const search = searchParams.get('search') || ''
     const category = searchParams.get('category')
     const license = searchParams.get('license') 
@@ -15,28 +17,136 @@ export async function GET(request: NextRequest) {
     const creatorId = searchParams.get('creatorId')
     const limit = parseInt(searchParams.get('limit') || '20')
     const offset = parseInt(searchParams.get('offset') || '0')
-    const sortBy = searchParams.get('sortBy') || 'createdAt'
+    const sortBy = searchParams.get('sort') || searchParams.get('sortBy') || 'popularity'
     const sortOrder = searchParams.get('sortOrder') || 'desc'
+    
+    // Advanced filtering parameters
+    const minPrice = searchParams.get('minPrice') ? parseFloat(searchParams.get('minPrice')!) : null
+    const maxPrice = searchParams.get('maxPrice') ? parseFloat(searchParams.get('maxPrice')!) : null
+    const minRating = searchParams.get('minRating') ? parseFloat(searchParams.get('minRating')!) : null
+    const maxRating = searchParams.get('maxRating') ? parseFloat(searchParams.get('maxRating')!) : null
+    const tags = searchParams.get('tags')?.split(',').filter(Boolean) || []
+    const architecture = searchParams.get('architecture')
+    const tasks = searchParams.get('tasks')?.split(',').filter(Boolean) || []
+    const inputModalities = searchParams.get('inputModalities')?.split(',').filter(Boolean) || []
+    const outputModalities = searchParams.get('outputModalities')?.split(',').filter(Boolean) || []
+    const verified = searchParams.get('verified')
+    const hasFreeTier = searchParams.get('hasFreeTier')
+    const modelSize = searchParams.get('modelSize') // e.g., "small", "medium", "large"
+    const maxLatency = searchParams.get('maxLatency') ? parseInt(searchParams.get('maxLatency')!) : null
+    const pricing = searchParams.get('pricing') // "free", "paid", "freemium"
 
     // Build where clause
     const whereClause: Record<string, unknown> = {
       status: 'PUBLISHED' // Only show published models
     }
 
+    // Enhanced search logic with fuzzy matching
     if (search) {
+      const searchTerm = search.toLowerCase().trim()
       whereClause.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
-        { tags: { has: search } }
+        { name: { contains: searchTerm, mode: 'insensitive' } },
+        { description: { contains: searchTerm, mode: 'insensitive' } },
+        { longDescription: { contains: searchTerm, mode: 'insensitive' } },
+        { architecture: { contains: searchTerm, mode: 'insensitive' } },
+        { tags: { hasSome: [searchTerm] } },
+        { tasks: { hasSome: [searchTerm] } },
+        { 
+          creator: { 
+            displayName: { contains: searchTerm, mode: 'insensitive' } 
+          } 
+        }
       ]
     }
 
+    // Category and license filters
     if (category) whereClause.category = category
     if (license) whereClause.license = license
     if (featured === 'true') whereClause.featured = true
     if (creatorId) whereClause.creatorId = creatorId
+    
+    // Architecture and technical filters
+    if (architecture) whereClause.architecture = { contains: architecture, mode: 'insensitive' }
+    if (tasks.length > 0) whereClause.tasks = { hasSome: tasks }
+    if (inputModalities.length > 0) whereClause.inputModalities = { hasSome: inputModalities }
+    if (outputModalities.length > 0) whereClause.outputModalities = { hasSome: outputModalities }
+    
+    // Tags filter
+    if (tags.length > 0) whereClause.tags = { hasSome: tags }
+    
+    // Rating filter
+    if (minRating !== null) {
+      whereClause.rating = { ...(whereClause.rating as object || {}), gte: minRating }
+    }
+    if (maxRating !== null) {
+      whereClause.rating = { ...(whereClause.rating as object || {}), lte: maxRating }
+    }
+    
+    // Performance filter
+    if (maxLatency !== null) {
+      whereClause.averageLatency = { lte: maxLatency }
+    }
+    
+    // Model size filter (approximate matching)
+    if (modelSize) {
+      const sizePatterns = {
+        'small': ['<1B', '1B', '2B', '3B', '7B'],
+        'medium': ['7B', '13B', '30B', '34B'],
+        'large': ['70B', '175B', '340B', '1.7B', '3.3B', '3.5B']
+      }
+      
+      const patterns = sizePatterns[modelSize as keyof typeof sizePatterns]
+      if (patterns) {
+        whereClause.OR = patterns.map(pattern => ({
+          modelSize: { contains: pattern, mode: 'insensitive' }
+        }))
+      }
+    }
+    
+    // Creator verification filter
+    if (verified === 'true') {
+      whereClause.creator = { verified: true }
+    }
 
-    // Fetch models with creator info
+    // Build the orderBy clause for different sort options
+    let orderBy: any = { createdAt: 'desc' } // default
+    
+    switch (sortBy) {
+      case 'popularity':
+        orderBy = [
+          { featured: 'desc' },
+          { downloadCount: 'desc' },
+          { apiCallCount: 'desc' }
+        ]
+        break
+      case 'rating':
+        orderBy = [
+          { rating: 'desc' },
+          { reviewCount: 'desc' }
+        ]
+        break
+      case 'downloads':
+        orderBy = { downloadCount: 'desc' }
+        break
+      case 'recent':
+        orderBy = { createdAt: 'desc' }
+        break
+      case 'name':
+        orderBy = { name: 'asc' }
+        break
+      case 'price-low':
+        // This requires a more complex query with pricing join
+        orderBy = { createdAt: 'desc' } // fallback for now
+        break
+      case 'price-high':
+        // This requires a more complex query with pricing join
+        orderBy = { createdAt: 'desc' } // fallback for now
+        break
+      default:
+        orderBy = { [sortBy]: sortOrder }
+    }
+
+    // Fetch models with enhanced includes
     const models = await prisma.model.findMany({
       where: whereClause,
       include: {
@@ -45,7 +155,8 @@ export async function GET(request: NextRequest) {
             id: true,
             displayName: true,
             verified: true,
-            rating: true
+            rating: true,
+            avatar: true
           }
         },
         pricing: {
@@ -56,33 +167,118 @@ export async function GET(request: NextRequest) {
             type: true,
             price: true,
             unit: true,
-            features: true
-          }
+            features: true,
+            supportLevel: true,
+            requestsPerMonth: true,
+            requestsPerMinute: true
+          },
+          orderBy: { price: 'asc' }
         },
         _count: {
           select: {
             reviews: true,
-            subscriptions: true
+            subscriptions: true,
+            usageRecords: true
           }
         }
       },
-      orderBy: { [sortBy]: sortOrder },
+      orderBy,
       take: limit,
       skip: offset
     })
 
-    // Get total count for pagination
+    // Apply pricing filters after fetching (since it requires joining)
+    let filteredModels = models
+    
+    if (minPrice !== null || maxPrice !== null || hasFreeTier || pricing) {
+      filteredModels = models.filter(model => {
+        const prices = model.pricing.map(p => p.price)
+        const hasFreePlan = model.pricing.some(p => p.type === 'FREE' || p.price === 0)
+        const minModelPrice = Math.min(...prices.filter(p => p > 0))
+        const maxModelPrice = Math.max(...prices)
+        
+        // Free tier filter
+        if (hasFreeTier === 'true' && !hasFreePlan) return false
+        
+        // Pricing type filter
+        if (pricing === 'free' && !hasFreePlan) return false
+        if (pricing === 'paid' && hasFreePlan && prices.every(p => p === 0)) return false
+        if (pricing === 'freemium' && !hasFreePlan) return false
+        
+        // Price range filter
+        if (minPrice !== null && minModelPrice < minPrice) return false
+        if (maxPrice !== null && maxModelPrice > maxPrice) return false
+        
+        return true
+      })
+    }
+
+    // Get total count for pagination (approximate for complex filters)
     const totalCount = await prisma.model.count({ where: whereClause })
+
+    // Calculate facets/aggregations for frontend filters
+    const facets = await Promise.all([
+      // Category counts
+      prisma.model.groupBy({
+        by: ['category'],
+        where: { status: 'PUBLISHED' },
+        _count: { category: true }
+      }),
+      // License counts  
+      prisma.model.groupBy({
+        by: ['license'],
+        where: { status: 'PUBLISHED' },
+        _count: { license: true }
+      }),
+      // Architecture counts
+      prisma.model.groupBy({
+        by: ['architecture'],
+        where: { status: 'PUBLISHED' },
+        _count: { architecture: true }
+      })
+    ])
+
+    const [categoryFacets, licenseFacets, architectureFacets] = facets
 
     return NextResponse.json({
       success: true,
       data: {
-        models,
+        models: filteredModels,
         pagination: {
           total: totalCount,
           limit,
           offset,
-          hasMore: offset + models.length < totalCount
+          hasMore: offset + filteredModels.length < totalCount
+        },
+        facets: {
+          categories: categoryFacets.map(f => ({ 
+            value: f.category, 
+            count: f._count.category 
+          })),
+          licenses: licenseFacets.map(f => ({ 
+            value: f.license, 
+            count: f._count.license 
+          })),
+          architectures: architectureFacets.map(f => ({ 
+            value: f.architecture, 
+            count: f._count.architecture 
+          }))
+        },
+        appliedFilters: {
+          search,
+          category,
+          license,
+          featured: featured === 'true',
+          minPrice,
+          maxPrice,
+          minRating,
+          maxRating,
+          tags,
+          architecture,
+          tasks,
+          verified: verified === 'true',
+          hasFreeTier: hasFreeTier === 'true',
+          pricing
         }
       }
     })
