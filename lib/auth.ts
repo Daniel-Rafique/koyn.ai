@@ -6,11 +6,19 @@ import GitHubProvider from "next-auth/providers/github"
 import bcrypt from "bcryptjs"
 import { prisma } from "./database"
 
+// Near the top of the file, add debugging helper:
+const debugLog = (message: string, data?: any) => {
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[AUTH DEBUG] ${message}`, data ? data : '')
+  }
+}
+
 // Build providers array
 const providers = []
 
 // Conditionally add OAuth providers based on environment variables
 if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+  debugLog(`Adding Google provider with clientId: ${process.env.GOOGLE_CLIENT_ID.substring(0, 5)}...`)
   providers.push(
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID,
@@ -26,10 +34,13 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
   )
   console.log("Auth: Added Google provider")
 } else {
-  console.log("Auth: Google provider not configured")
+  console.log("Auth: Google provider not configured", 
+    process.env.GOOGLE_CLIENT_ID ? "Has client ID" : "Missing client ID", 
+    process.env.GOOGLE_CLIENT_SECRET ? "Has client secret" : "Missing client secret")
 }
 
 if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
+  debugLog(`Adding GitHub provider with clientId: ${process.env.GITHUB_CLIENT_ID.substring(0, 5)}...`)
   providers.push(
     GitHubProvider({
       clientId: process.env.GITHUB_CLIENT_ID,
@@ -38,7 +49,9 @@ if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
   )
   console.log("Auth: Added GitHub provider")
 } else {
-  console.log("Auth: GitHub provider not configured")
+  console.log("Auth: GitHub provider not configured", 
+    process.env.GITHUB_CLIENT_ID ? "Has client ID" : "Missing client ID", 
+    process.env.GITHUB_CLIENT_SECRET ? "Has client secret" : "Missing client secret")
 }
 
 // Always add credentials provider
@@ -133,8 +146,7 @@ export const authOptions: NextAuthOptions = {
     },
 
     async signIn({ user, account, profile }) {
-      console.log("SignIn Callback - Provider:", account?.provider)
-      console.log("SignIn Callback - User:", JSON.stringify({email: user.email, name: user.name}))
+      debugLog("SignIn callback triggered", { provider: account?.provider, email: user.email })
       
       if (account?.provider === "google" || account?.provider === "github") {
         try {
@@ -143,24 +155,25 @@ export const authOptions: NextAuthOptions = {
             where: { email: user.email! }
           })
           
-          console.log("SignIn Callback - Existing user:", existingUser ? "Found" : "Not found")
+          debugLog("SignIn Callback - Existing user found:", existingUser ? "true" : "false")
 
           if (!existingUser) {
             // Create new user from OAuth
-            await prisma.user.create({
+            const newUser = await prisma.user.create({
               data: {
                 email: user.email!,
-                name: user.name || "",
+                name: user.name || user.email!.split('@')[0],
                 avatar: user.image,
                 type: "CONSUMER",
                 emailVerified: new Date(), // Auto-verify OAuth users
               }
             })
-            console.log("SignIn Callback - Created new user")
+            debugLog("Created new OAuth user", { id: newUser.id, email: newUser.email })
           }
           return true
         } catch (error) {
           console.error("Sign in error:", error)
+          debugLog("OAuth Sign-in error", { message: (error as Error).message })
           return false
         }
       }

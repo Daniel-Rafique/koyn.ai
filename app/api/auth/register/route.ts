@@ -5,13 +5,22 @@ import { withRateLimit, rateLimiters } from "@/lib/rate-limit"
 import { validateRequest, userSchemas, sanitizers, securityValidation } from "@/lib/validation"
 import { createVerificationToken, sendVerificationEmail } from "@/lib/email-verification"
 
+// Add debug logging helper
+const debugLog = (message: string, data?: any) => {
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[REGISTER DEBUG] ${message}`, data ? data : '')
+  }
+}
+
 async function registerHandler(request: NextRequest) {
   try {
     const body = await request.json()
+    debugLog("Registration request", { email: body.email, username: body.username })
     
     // Validate request data using our schema
     const validation = validateRequest(userSchemas.register)(body)
     if (!validation.success) {
+      debugLog("Validation failed", validation.errors.issues)
       return NextResponse.json(
         { 
           error: "Validation failed", 
@@ -25,12 +34,14 @@ async function registerHandler(request: NextRequest) {
     }
 
     const { email, username, displayName, password, role } = validation.data
+    debugLog("Validated data", { email, username, role })
 
     // Security checks
     if (securityValidation.hasSQLInjection(email) || 
         securityValidation.hasSQLInjection(username) ||
         securityValidation.hasXSS(email) || 
         securityValidation.hasXSS(username)) {
+      debugLog("Security validation failed")
       return NextResponse.json(
         { error: "Invalid input detected" },
         { status: 400 }
@@ -46,6 +57,7 @@ async function registerHandler(request: NextRequest) {
     })
 
     if (existingUserByEmail) {
+      debugLog("User already exists", { email })
       return NextResponse.json(
         { error: "A user with this email already exists" },
         { status: 409 }
@@ -58,6 +70,7 @@ async function registerHandler(request: NextRequest) {
     })
 
     if (existingUserByName) {
+      debugLog("Username already taken", { username })
       return NextResponse.json(
         { error: "This username is already taken" },
         { status: 409 }
@@ -67,6 +80,7 @@ async function registerHandler(request: NextRequest) {
     // Hash password with higher salt rounds for security
     const saltRounds = 14
     const hashedPassword = await bcrypt.hash(password, saltRounds)
+    debugLog("Password hashed successfully")
 
     // Create user
     const user = await prisma.user.create({
@@ -86,13 +100,16 @@ async function registerHandler(request: NextRequest) {
         createdAt: true,
       }
     })
+    debugLog("User created successfully", { id: user.id, email: user.email })
 
     // Send verification email
     try {
       const verificationToken = await createVerificationToken(user.id, user.email)
       await sendVerificationEmail(user.email, verificationToken)
+      debugLog("Verification email sent", { email: user.email })
     } catch (emailError) {
       console.error('Failed to send verification email:', emailError)
+      debugLog("Failed to send verification email", { error: (emailError as Error).message })
       // Don't fail registration if email fails, just log it
     }
 
@@ -110,6 +127,7 @@ async function registerHandler(request: NextRequest) {
           createdAt: new Date(),
         }
       })
+      debugLog("Creator profile created", { userId: user.id })
     }
 
     // Log successful registration (without sensitive data)
@@ -123,23 +141,12 @@ async function registerHandler(request: NextRequest) {
 
   } catch (error) {
     console.error("Registration error:", error)
-    
-    // Handle specific database errors
-    if (error instanceof Error) {
-      if (error.message.includes('Unique constraint')) {
-        return NextResponse.json(
-          { error: "Account with this email already exists" },
-          { status: 409 }
-        )
-      }
-    }
-
+    debugLog("Registration error", { message: (error as Error).message })
     return NextResponse.json(
-      { error: "Failed to create account. Please try again." },
+      { error: "Failed to create account" },
       { status: 500 }
     )
   }
 }
 
-// Export with rate limiting
-export const POST = withRateLimit(rateLimiters.registration, registerHandler) 
+export const POST = withRateLimit(rateLimiters.auth, registerHandler) 
