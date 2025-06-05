@@ -75,10 +75,21 @@ export default function SignInPage() {
     if (provider === "google") setIsGoogleLoading(true)
     if (provider === "github") setIsGithubLoading(true)
 
+    // Set a sensible callbackUrl that works in both environments
+    const effectiveCallbackUrl = process.env.NODE_ENV === 'development'
+      ? 'http://localhost:3000'
+      : 'https://koyn.ai';
+
+    console.log(`Signing in with ${provider}, callback: ${effectiveCallbackUrl}`);
+
     try {
-      await signIn(provider, { callbackUrl })
+      await signIn(provider, { 
+        callbackUrl: effectiveCallbackUrl,
+        redirect: true
+      })
     } catch (error) {
       console.error(`Error signing in with ${provider}:`, error)
+      setFormErrors({ general: `Authentication with ${provider} failed. Please try again.` })
     } finally {
       setIsGoogleLoading(false)
       setIsGithubLoading(false)

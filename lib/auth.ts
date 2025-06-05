@@ -19,6 +19,13 @@ const providers = []
 // Conditionally add OAuth providers based on environment variables
 if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
   debugLog(`Adding Google provider with clientId: ${process.env.GOOGLE_CLIENT_ID.substring(0, 5)}...`)
+  
+  const callbackUrl = process.env.NODE_ENV === 'development' 
+    ? 'http://localhost:3000/api/auth/callback/google' 
+    : 'https://koyn.ai/api/auth/callback/google';
+    
+  debugLog(`Google callback URL: ${callbackUrl}`);
+  
   providers.push(
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID,
@@ -27,7 +34,8 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
         params: {
           prompt: "consent",
           access_type: "offline",
-          response_type: "code"
+          response_type: "code",
+          redirect_uri: callbackUrl
         }
       }
     })
@@ -41,10 +49,22 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
 
 if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
   debugLog(`Adding GitHub provider with clientId: ${process.env.GITHUB_CLIENT_ID.substring(0, 5)}...`)
+  
+  const callbackUrl = process.env.NODE_ENV === 'development' 
+    ? 'http://localhost:3000/api/auth/callback/github' 
+    : 'https://koyn.ai/api/auth/callback/github';
+    
+  debugLog(`GitHub callback URL: ${callbackUrl}`);
+  
   providers.push(
     GitHubProvider({
       clientId: process.env.GITHUB_CLIENT_ID,
-      clientSecret: process.env.GITHUB_CLIENT_SECRET
+      clientSecret: process.env.GITHUB_CLIENT_SECRET,
+      authorization: {
+        params: {
+          redirect_uri: callbackUrl
+        }
+      }
     })
   )
   console.log("Auth: Added GitHub provider")
@@ -181,14 +201,38 @@ export const authOptions: NextAuthOptions = {
     },
 
     async redirect({ url, baseUrl }) {
-      console.log("Redirect Callback - URL:", url)
-      console.log("Redirect Callback - Base URL:", baseUrl)
+      debugLog("Redirect Callback - Original URL:", url)
+      debugLog("Redirect Callback - Base URL:", baseUrl)
       
-      // Allows relative callback URLs
-      if (url.startsWith("/")) return `${baseUrl}${url}`
-      // Allows callback URLs on the same origin
-      else if (new URL(url).origin === baseUrl) return url
-      return baseUrl
+      // Handle production vs development URLs
+      const productionUrl = "https://koyn.ai";
+      const developmentUrl = "http://localhost:3000";
+      
+      // If we're in a production environment but get localhost URLs, fix them
+      if (process.env.NODE_ENV === 'production' && url.includes('localhost')) {
+        url = url.replace(developmentUrl, productionUrl);
+        debugLog("Redirect fixed for production:", url);
+      }
+      
+      // If we're in development but get production URLs, fix them
+      if (process.env.NODE_ENV === 'development' && url.includes('koyn.ai')) {
+        url = url.replace(productionUrl, developmentUrl);
+        debugLog("Redirect fixed for development:", url);
+      }
+      
+      // Standard NextAuth redirect logic
+      if (url.startsWith("/")) {
+        const finalUrl = `${baseUrl}${url}`;
+        debugLog("Final redirect URL (relative):", finalUrl);
+        return finalUrl;
+      }
+      else if (new URL(url).origin === baseUrl) {
+        debugLog("Final redirect URL (same origin):", url);
+        return url;
+      }
+      
+      debugLog("Final redirect URL (default):", baseUrl);
+      return baseUrl;
     }
   },
 

@@ -72,7 +72,7 @@ export default function SignUpPage() {
       errors.agreeToTerms = "You must agree to the terms and conditions"
     }
 
-    return errors
+    return Object.keys(errors).length === 0
   }
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -80,41 +80,40 @@ export default function SignUpPage() {
     setIsLoading(true)
     setFormErrors({})
 
-    const errors = validateForm()
-    if (Object.keys(errors).length > 0) {
-      setFormErrors(errors)
+    if (!validateForm()) {
       setIsLoading(false)
       return
     }
 
     try {
+      console.log("Submitting signup form", { email: formData.email });
+      
+      // Register the user
       const response = await fetch("/api/auth/register", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: formData.email,
           username: formData.username,
-          displayName: formData.displayName,
+          displayName: formData.displayName || formData.username,
           password: formData.password,
           role: formData.role,
-          subscribeNewsletter: formData.subscribeNewsletter,
         }),
       })
 
       const data = await response.json()
 
       if (!response.ok) {
-        if (response.status === 409) {
-          setFormErrors({ general: data.error || "User already exists" })
-        } else {
-          setFormErrors({ general: data.error || "Failed to create account" })
-        }
+        console.error("Registration error:", data);
+        setFormErrors({
+          general: data.error || "Failed to create account",
+        })
+        setIsLoading(false)
         return
       }
 
-      // Auto-sign in after successful registration
+      console.log("Registration successful, attempting sign-in");
+      // Sign in the user after successful registration
       const result = await signIn("credentials", {
         email: formData.email,
         password: formData.password,
@@ -122,8 +121,10 @@ export default function SignUpPage() {
       })
 
       if (result?.error) {
+        console.error("Post-registration sign-in failed:", result.error);
         setFormErrors({ general: "Account created but sign-in failed. Please try signing in manually." })
       } else {
+        console.log("Sign-in successful, redirecting to home");
         router.push("/")
         router.refresh()
       }
@@ -139,10 +140,21 @@ export default function SignUpPage() {
     if (provider === "google") setIsGoogleLoading(true)
     if (provider === "github") setIsGithubLoading(true)
 
+    // Set a sensible callbackUrl that works in both environments
+    const effectiveCallbackUrl = process.env.NODE_ENV === 'development'
+      ? 'http://localhost:3000'
+      : 'https://koyn.ai';
+
+    console.log(`Signing up with ${provider}, callback: ${effectiveCallbackUrl}`);
+
     try {
-      await signIn(provider, { callbackUrl: "/" })
+      await signIn(provider, { 
+        callbackUrl: effectiveCallbackUrl,
+        redirect: true
+      })
     } catch (error) {
       console.error(`Error signing up with ${provider}:`, error)
+      setFormErrors({ general: `Authentication with ${provider} failed. Please try again.` })
     } finally {
       setIsGoogleLoading(false)
       setIsGithubLoading(false)
